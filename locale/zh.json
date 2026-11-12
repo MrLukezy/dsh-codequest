@@ -1,0 +1,9 @@
+{
+  "meta": {
+    "title": "CodeQuest · DSH 成就",
+    "description": "把 DSH 的 Token 流量、会话内容与工具调用变成成就游戏，可连接自建服务器参与排行榜。"
+  },
+  "view": {
+    "tab": "CodeQuest"
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "name": "dsh-codequest",
+  "version": "0.5.0",
+  "private": true,
+  "type": "module",
+  "description": "CodeQuest for DeepSeek Harness: achievement game driven by real DSH token traffic and session content, with an optional self-hosted leaderboard.",
+  "license": "MIT",
+  "icon": "icon.png",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "cordis",
+    "achievements",
+    "gamification"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MrLukezy/dsh-codequest.git"
+  },
+  "homepage": "https://github.com/MrLukezy/dsh-codequest#readme",
+  "bugs": {
+    "url": "https://github.com/MrLukezy/dsh-codequest/issues"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.png"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "achievements.js",
+    "art.js",
+    "scan.js",
+    "text.js",
+    "cloud.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "assets/icons/*.webp",
+    "icon.png",
+    "README.md",
+    "test/*.mjs"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  }
+}

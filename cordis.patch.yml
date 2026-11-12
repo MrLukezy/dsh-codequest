@@ -1,0 +1,5 @@
+# CodeQuest for DSH: Host half reads DSH session logs and serves the JSON
+# routes; the `dsh.client` declaration loads ./client.js as the browser half.
+- insert:
+    - id: dsh-codequest
+      name: dsh-codequest
