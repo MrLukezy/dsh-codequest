@@ -27,7 +27,7 @@ window.__ModuleLoader__.load({
         achievements: '成就',
         dashboard: '数据',
         leaderboard: '排行榜',
-        noServer: '还没有配置排行榜服务器，在「账号 → 服务器地址」里填一个就能上榜',
+        noServer: '还没有配置排行榜服务器，在「账号 → 服务器与密钥」里填一个就能上榜',
         board_achievements: '成就数',
         board_points: '积分',
         board_level: '等级',
@@ -92,6 +92,9 @@ window.__ModuleLoader__.load({
         register: '注册',
         logout: '退出登录',
       devices: '登录设备',
+      serverSettings: '服务器与密钥',
+      configured: '已配置',
+      notConfigured: '未配置',
       thisDevice: '含当前设备',
       revokeOthers: '退出其它设备',
       revokedOthers: '其它设备已退出',
@@ -106,7 +109,7 @@ window.__ModuleLoader__.load({
         achCount: '成就数',
         emptyBoard: '排行榜暂无数据',
         loading: '加载中…',
-        cloudBase: '服务器地址',
+        cloudBase: '服务器与密钥',
         save: '保存',
         hidden: '隐藏成就',
         secret: '???',
@@ -239,6 +242,9 @@ window.__ModuleLoader__.load({
         register: 'Sign up',
         logout: 'Log out',
       devices: 'Devices',
+      serverSettings: 'Server & secret',
+      configured: 'configured',
+      notConfigured: 'not configured',
       thisDevice: 'including this one',
       revokeOthers: 'Sign out others',
       revokedOthers: 'Other devices signed out',
@@ -253,7 +259,7 @@ window.__ModuleLoader__.load({
         achCount: 'Achievements',
         emptyBoard: 'No leaderboard data yet',
         loading: 'Loading…',
-        cloudBase: 'Server URL',
+        cloudBase: 'Server & secret',
         save: 'Save',
         hidden: 'Hidden',
         secret: '???',
@@ -1989,6 +1995,19 @@ function levelArtUrl(level) {
       );
     }
 
+    /** Hide the host: keep the TLD so it is recognisable, mask the rest. */
+    function maskUrl(url) {
+      if (!url) return '';
+      try {
+        const parsed = new URL(url);
+        const host = parsed.hostname;
+        const tld = host.split('.').pop() || '';
+        const masked = '•'.repeat(Math.max(4, host.length - tld.length - 1));
+        return `${parsed.protocol}//${masked}.${tld}${parsed.pathname}`;
+      } catch {
+        return '••••';
+      }
+    }
     function AccountTab({ data, t, reload }) {
       const [email, setEmail] = useState('');
       const [password, setPassword] = useState('');
@@ -1999,6 +2018,7 @@ function levelArtUrl(level) {
       const [identity, setIdentity] = useState(null);
       const [showEmail, setShowEmail] = useState(false);
       const [secret, setSecret] = useState('');
+      const [showServer, setShowServer] = useState(false);
 
       useEffect(() => {
         let alive = true;
@@ -2218,31 +2238,50 @@ function levelArtUrl(level) {
         h(
           'div',
           { className: 'cq-panel' },
-          h('h4', null, t('cloudBase')),
+          // Collapsed by default: the endpoint and the shared secret are
+          // deployment details, not something to put on screen (or in a
+          // screenshot) unless the user is actually reconfiguring.
           h(
-            'div',
-            { className: 'cq-actions' },
-            h('input', { className: 'cq-input', style: { flex: 1, minWidth: '220px' }, value: base, onChange: (e) => setBase(e.target.value) }),
-            h('button', { className: 'cq-btn', type: 'button', disabled: busy, onClick: () => void call('/config', { cloudBase: base }, t('save')) }, t('save')),
-          ),
-          h('div', { className: 'cq-note', style: { marginTop: '10px' } }, t('sharedSecretHint')),
-          h(
-            'div',
-            { className: 'cq-actions' },
-            h('input', {
-              className: 'cq-input',
-              style: { flex: 1, minWidth: '220px' },
-              type: 'password',
-              placeholder: data.cloud.hasSecret ? t('sharedSecretSet') : t('sharedSecret'),
-              value: secret,
-              onChange: (e) => setSecret(e.target.value),
-            }),
+            'button',
+            { type: 'button', className: 'cq-disclose', onClick: () => setShowServer((prev) => !prev) },
+            showServer ? '▾' : '▸',
+            t('serverSettings'),
             h(
-              'button',
-              { className: 'cq-btn', type: 'button', disabled: busy, onClick: () => void call('/config', { sharedSecret: secret }, t('save')) },
-              t('save'),
+              'span',
+              { className: 'cq-note', style: { marginLeft: '8px', fontWeight: 400 } },
+              data.cloud.base ? `${t('configured')} · ${maskUrl(data.cloud.base)}` : t('notConfigured'),
             ),
           ),
+          showServer
+            ? h(
+                'div',
+                { style: { marginTop: '10px' } },
+                h(
+                  'div',
+                  { className: 'cq-actions' },
+                  h('input', { className: 'cq-input', style: { flex: 1, minWidth: '220px' }, value: base, onChange: (e) => setBase(e.target.value) }),
+                  h('button', { className: 'cq-btn', type: 'button', disabled: busy, onClick: () => void call('/config', { cloudBase: base }, t('save')) }, t('save')),
+                ),
+                h('div', { className: 'cq-note', style: { marginTop: '10px' } }, t('sharedSecretHint')),
+                h(
+                  'div',
+                  { className: 'cq-actions' },
+                  h('input', {
+                    className: 'cq-input',
+                    style: { flex: 1, minWidth: '220px' },
+                    type: 'password',
+                    placeholder: data.cloud.hasSecret ? t('sharedSecretSet') : t('sharedSecret'),
+                    value: secret,
+                    onChange: (e) => setSecret(e.target.value),
+                  }),
+                  h(
+                    'button',
+                    { className: 'cq-btn', type: 'button', disabled: busy, onClick: () => void call('/config', { sharedSecret: secret }, t('save')) },
+                    t('save'),
+                  ),
+                ),
+              )
+            : null,
         ),
       );
     }
