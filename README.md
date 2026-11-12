@@ -44,7 +44,7 @@ dsh-codequest/            ← 插件包根目录（DSH 直接安装这一层）
 | 成就 | 313 枚成就，按 12 个分类**分组展示**（每组带 `已解锁/总数` 与积分进度条）；支持**搜索**、按「接近达成 / 稀有度 / 最近解锁」排序、**最近解锁时间线**；点击卡片弹出详情（达成条件、当前值/目标值、百分比、还差多少、解锁时间） |
 | 数据 | 6 张渐变 KPI 卡（累计 Token / 会话 / 工具 / 缓存命中 / 连续 / 轮次）、30 天流量面积图（峰值标注 + 日均）、24 小时时段条（高峰高亮）、情绪堆叠条 + 图例、工具 / 文件 / 命令三列带比例轨的排行榜、文本性格胶囊（按占比填充）、模型分布与概览 |
 | 排行榜 | 11 个榜单可切换（成就 / 积分 / 等级 / Token / 会话 / 连续天数 / 活跃天数 / 工具调用 / 代码块 / 今日 Token / 赛季），前 50，带头像与自己那一行的高亮 |
-| 账号 | **DeepSeek 账号一键登录**、同步、退出、登录设备管理；服务器地址与共享密钥收在默认折叠的「服务器与密钥」里，只显示掩码（邮箱密码作为备用入口） |
+| 账号 | **DeepSeek 账号一键登录**、同步、退出、登录设备管理；服务器地址**只在未配置时出现一次**，配置好之后界面上完全不显示（邮箱密码作为备用入口） |
 
 顶部是等级徽章、称号、积分与升级进度条。
 
@@ -141,7 +141,7 @@ a('my_achievement', '名字', '风味文案', '达成条件说明', '🎯', 'rar
 
 服务端在 `server/`，Express + better-sqlite3，单文件、无外部依赖服务。
 
-**插件不带任何默认服务器地址**：公开仓库里写死作者自己的服务器，等于把地址发给所有人。装好后在「账号 → 服务器与密钥」填你自己的，或设置 `DSH_CODEQUEST_CLOUD` 环境变量；两者都没有时排行榜整块显示「未配置」，不影响单机玩。
+**插件不带任何默认服务器地址**：公开仓库里写死作者自己的服务器，等于把地址发给所有人。装好后在「账号」页填你自己的（该面板**只在未配置时出现，配置完就消失**），或设置 `DSH_CODEQUEST_CLOUD` 环境变量，或直接 `POST /dsh-codequest/config {"cloudBase":"…"}`；都没有时排行榜整块显示「未配置」，不影响单机玩。
 
 排行榜支持 **11 个榜**，界面上用 chip 切换：成就数、积分、等级、累计 Token、会话数、连续天数、活跃天数、工具调用、代码块、今日 Token、赛季成就。所有数值在服务端按字段取 MAX 合并，客户端重传一个更小的数不会把名次冲掉。
 
@@ -178,7 +178,7 @@ DSH_SHARED_SECRET="$(openssl rand -hex 24)" JWT_SECRET="$(openssl rand -hex 32)"
 | `ADMIN_USER` / `ADMIN_PASS` | `/admin` 后台账号，默认 `admin` / 占位密码，**必须改** |
 | `DSH_SHARED_SECRET` | 与插件共享的免密登录密钥；留空则关闭 `/auth/dsh` |
 
-然后把插件「账号 → 服务器与密钥」改成你的 `${BASE_PATH}/api`，把同一个 `DSH_SHARED_SECRET` 填到「共享密钥」里（也可以直接 `POST /dsh-codequest/config {"sharedSecret":"…"}`）。
+然后把插件「账号」页（未配置时出现）填成你的 `${BASE_PATH}/api`，把同一个 `DSH_SHARED_SECRET` 填到「共享密钥」里；也可以直接 `POST /dsh-codequest/config {"cloudBase":"…","sharedSecret":"…"}`。
 
 ### 接口
 
@@ -199,7 +199,7 @@ DSH_SHARED_SECRET="$(openssl rand -hex 24)" JWT_SECRET="$(openssl rand -hex 32)"
 
 **共享密钥不写死在仓库里**：插件侧通过 `state.json` 的 `cloud.sharedSecret`（界面「账号 → 共享密钥」或 `POST /dsh-codequest/config`）设置，服务端侧用环境变量 `DSH_SHARED_SECRET`，两处一致即可。仓库里的默认值 `change-me-codequest-shared-secret` 只是占位符，正式部署必须换掉。
 
-服务器地址可在界面「账号 → 服务器地址」里改，也保存在 `state.json` 的 `cloud.base`。
+服务器地址存在 `state.json` 的 `cloud.base`。界面里**只在未配置时**提供一个一次性填写入口，配置完成后该面板不再渲染——地址不会出现在任何页面、截图或录屏里。要改地址就直接编辑 `state.json` 或 `POST /dsh-codequest/config {"cloudBase":"…"}`。
 
 ## Host 路由
 

@@ -109,7 +109,7 @@ window.__ModuleLoader__.load({
         achCount: '成就数',
         emptyBoard: '排行榜暂无数据',
         loading: '加载中…',
-        cloudBase: '服务器与密钥',
+        serverHint: '填一个自建服务端的 API 地址，例如 https://你的域名/codequest/api。配置后这块就不再显示。',
         save: '保存',
         hidden: '隐藏成就',
         secret: '???',
@@ -259,7 +259,7 @@ window.__ModuleLoader__.load({
         achCount: 'Achievements',
         emptyBoard: 'No leaderboard data yet',
         loading: 'Loading…',
-        cloudBase: 'Server & secret',
+        serverHint: 'Point this at your own server, e.g. https://your-domain/codequest/api. This panel disappears once set.',
         save: 'Save',
         hidden: 'Hidden',
         secret: '???',
@@ -1995,19 +1995,6 @@ function levelArtUrl(level) {
       );
     }
 
-    /** Hide the host: keep the TLD so it is recognisable, mask the rest. */
-    function maskUrl(url) {
-      if (!url) return '';
-      try {
-        const parsed = new URL(url);
-        const host = parsed.hostname;
-        const tld = host.split('.').pop() || '';
-        const masked = '•'.repeat(Math.max(4, host.length - tld.length - 1));
-        return `${parsed.protocol}//${masked}.${tld}${parsed.pathname}`;
-      } catch {
-        return '••••';
-      }
-    }
     function AccountTab({ data, t, reload }) {
       const [email, setEmail] = useState('');
       const [password, setPassword] = useState('');
@@ -2018,7 +2005,6 @@ function levelArtUrl(level) {
       const [identity, setIdentity] = useState(null);
       const [showEmail, setShowEmail] = useState(false);
       const [secret, setSecret] = useState('');
-      const [showServer, setShowServer] = useState(false);
 
       useEffect(() => {
         let alive = true;
@@ -2235,54 +2221,40 @@ function levelArtUrl(level) {
               )
             : null,
         ),
-        h(
-          'div',
-          { className: 'cq-panel' },
-          // Collapsed by default: the endpoint and the shared secret are
-          // deployment details, not something to put on screen (or in a
-          // screenshot) unless the user is actually reconfiguring.
-          h(
-            'button',
-            { type: 'button', className: 'cq-disclose', onClick: () => setShowServer((prev) => !prev) },
-            showServer ? '▾' : '▸',
-            t('serverSettings'),
-            h(
-              'span',
-              { className: 'cq-note', style: { marginLeft: '8px', fontWeight: 400 } },
-              data.cloud.base ? `${t('configured')} · ${maskUrl(data.cloud.base)}` : t('notConfigured'),
-            ),
-          ),
-          showServer
-            ? h(
+        // Only when nothing is configured yet. Once an endpoint exists there
+        // is no reason to put it on screen — or in a screenshot — at all.
+        data.cloud.base
+          ? null
+          : h(
+              'div',
+              { className: 'cq-panel' },
+              h('h4', null, t('serverSettings')),
+              h('div', { className: 'cq-note', style: { marginTop: '4px' } }, t('serverHint')),
+              h(
                 'div',
-                { style: { marginTop: '10px' } },
+                { className: 'cq-actions', style: { marginTop: '10px' } },
+                h('input', { className: 'cq-input', style: { flex: 1, minWidth: '220px' }, value: base, onChange: (e) => setBase(e.target.value) }),
+                h('button', { className: 'cq-btn', type: 'button', disabled: busy, onClick: () => void call('/config', { cloudBase: base }, t('save')) }, t('save')),
+              ),
+              h('div', { className: 'cq-note', style: { marginTop: '10px' } }, t('sharedSecretHint')),
+              h(
+                'div',
+                { className: 'cq-actions' },
+                h('input', {
+                  className: 'cq-input',
+                  style: { flex: 1, minWidth: '220px' },
+                  type: 'password',
+                  placeholder: data.cloud.hasSecret ? t('sharedSecretSet') : t('sharedSecret'),
+                  value: secret,
+                  onChange: (e) => setSecret(e.target.value),
+                }),
                 h(
-                  'div',
-                  { className: 'cq-actions' },
-                  h('input', { className: 'cq-input', style: { flex: 1, minWidth: '220px' }, value: base, onChange: (e) => setBase(e.target.value) }),
-                  h('button', { className: 'cq-btn', type: 'button', disabled: busy, onClick: () => void call('/config', { cloudBase: base }, t('save')) }, t('save')),
+                  'button',
+                  { className: 'cq-btn', type: 'button', disabled: busy, onClick: () => void call('/config', { sharedSecret: secret }, t('save')) },
+                  t('save'),
                 ),
-                h('div', { className: 'cq-note', style: { marginTop: '10px' } }, t('sharedSecretHint')),
-                h(
-                  'div',
-                  { className: 'cq-actions' },
-                  h('input', {
-                    className: 'cq-input',
-                    style: { flex: 1, minWidth: '220px' },
-                    type: 'password',
-                    placeholder: data.cloud.hasSecret ? t('sharedSecretSet') : t('sharedSecret'),
-                    value: secret,
-                    onChange: (e) => setSecret(e.target.value),
-                  }),
-                  h(
-                    'button',
-                    { className: 'cq-btn', type: 'button', disabled: busy, onClick: () => void call('/config', { sharedSecret: secret }, t('save')) },
-                    t('save'),
-                  ),
-                ),
-              )
-            : null,
-        ),
+              ),
+            ),
       );
     }
 
