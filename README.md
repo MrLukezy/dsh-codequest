@@ -116,6 +116,8 @@ $DSH_HOME/storages/dsh-codequest/state.json
 
 ## 美术资源
 
+![徽章图集（部分）](docs/badges.png)
+
 - 徽章来自 `MrLukezy/ai-using-achievement` 的 chibi 成就图（MIT），已裁掉透明边、居中方形化并缩到 192px WebP，共 84 张，合计约 1.5 MB。
 - 映射表在 `art.js`（99 条成就 → 84 张徽章，一一对应，无遗漏）；重复使用的徽章只出现在语义相近的成就上。
 - 文件放在 `assets/icons/<name>.webp`，由 Host 的 prefix 路由 `GET /dsh-codequest/icon/<name>.webp` 以 `image/webp` + `immutable` 缓存下发；只接受 `[a-z0-9_]+\.webp`，路径穿越直接 404。
