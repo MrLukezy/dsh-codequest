@@ -67,7 +67,7 @@ function walk(node, stats = { elements: 0, text: [] }) {
     if (node.props && node.props.className === 'cq-card') stats.cards = (stats.cards || 0) + 1;
     if (node.type === 'img' && node.props && typeof node.props.src === 'string') {
       stats.images = (stats.images || 0) + 1;
-      if (!/\/icon\/[a-z0-9_]+\.webp$/.test(node.props.src)) throw new Error(`bad icon url: ${node.props.src}`);
+      if (!/\/(icon|level)\/[a-z0-9_]+\.webp$/.test(node.props.src)) throw new Error(`bad art url: ${node.props.src}`);
     }
     walk(node.children, stats);
     return stats;

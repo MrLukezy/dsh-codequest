@@ -23,7 +23,7 @@ export const name = 'dsh-codequest';
 
 const PREFIX = '/dsh-codequest';
 /** Bumped whenever the fold/metrics semantics change; surfaced for diagnostics. */
-const BUILD = '2026-11-12.6';
+const BUILD = '2026-11-12.7';
 const DEFAULT_CLOUD_BASE = 'http://your-host.example/codequest/api';
 const STATE_VERSION = 1;
 const LIVE_REFRESH_MS = 20_000;
@@ -40,10 +40,12 @@ const MAX_BODY_BYTES = 64 * 1024;
  * `DSH_SHARED_SECRET` environment variable. Both sides must match.
  */
 const PLACEHOLDER_SHARED_SECRET = 'change-me-codequest-shared-secret';
-const PLUGIN_VERSION = '0.5.0';
+const PLUGIN_VERSION = '0.6.0';
 
 /** Achievement badges ship with the package and are served as static WebP. */
 const ICON_ROOT = fileURLToPath(new URL('./assets/icons/', import.meta.url));
+/** Level-tier portraits, one per title tier (1-7). */
+const LEVEL_ROOT = fileURLToPath(new URL('./assets/levels/', import.meta.url));
 
 function stateDir() {
   const home = process.env.DSH_HOME || path.join(os.homedir(), '.dsh');
@@ -659,34 +661,39 @@ export function apply(ctx) {
     ];
   }
 
-  /** Serve one badge: `/<prefix>/icon/<art>.webp`. Only the packaged art names resolve. */
-  function serveIcon(req, res) {
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
-      res.statusCode = 405;
-      res.end();
-      return;
-    }
-    const pathname = String(req.url || '').split('?')[0];
-    const name = pathname.slice(pathname.lastIndexOf('/') + 1);
-    if (!/^[a-z0-9_]+\.webp$/i.test(name)) {
-      res.statusCode = 404;
-      res.end();
-      return;
-    }
-    const file = path.join(ICON_ROOT, name);
-    fs.readFile(file, (error, buffer) => {
-      if (error) {
+  /** Serve one packaged image: `/<prefix>/icon/<name>.webp` or `/level/<name>.webp`. */
+  function serveArt(root) {
+    return (req, res) => {
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        res.statusCode = 405;
+        res.end();
+        return;
+      }
+      const pathname = String(req.url || '').split('?')[0];
+      const name = pathname.slice(pathname.lastIndexOf('/') + 1);
+      if (!/^[a-z0-9_]+\.webp$/i.test(name)) {
         res.statusCode = 404;
         res.end();
         return;
       }
-      res.statusCode = 200;
-      res.setHeader('content-type', 'image/webp');
-      res.setHeader('content-length', String(buffer.length));
-      res.setHeader('cache-control', 'public, max-age=604800, immutable');
-      res.end(req.method === 'HEAD' ? undefined : buffer);
-    });
+      const file = path.join(root, name);
+      fs.readFile(file, (error, buffer) => {
+        if (error) {
+          res.statusCode = 404;
+          res.end();
+          return;
+        }
+        res.statusCode = 200;
+        res.setHeader('content-type', 'image/webp');
+        res.setHeader('content-length', String(buffer.length));
+        res.setHeader('cache-control', 'public, max-age=604800, immutable');
+        res.end(req.method === 'HEAD' ? undefined : buffer);
+      });
+    };
   }
+
+  const serveIcon = serveArt(ICON_ROOT);
+  const serveLevel = serveArt(LEVEL_ROOT);
 
   ctx.effect(() => {
     const timer = setTimeout(() => {
@@ -724,12 +731,20 @@ export function apply(ctx) {
         () => webCtx.webServer.register({ kind: 'prefix', path: iconPath, handler: serveIcon }),
         `dsh-codequest: icons ${iconPath}`,
       );
+      const levelPath = `${prefix}${PREFIX}/level`;
+      webCtx.effect(
+        () => webCtx.webServer.register({ kind: 'prefix', path: levelPath, handler: serveLevel }),
+        `dsh-codequest: levels ${levelPath}`,
+      );
     }
   });
 
   recompute();
   ctx.logger?.info?.(`dsh-codequest: ready (${Object.keys(state.sessions).length} cached session(s))`);
 }
+
+
+
 
 
 

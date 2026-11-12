@@ -118,12 +118,17 @@ $DSH_HOME/storages/dsh-codequest/state.json
 
 ![徽章图集（部分）](docs/badges.png)
 
+**等级头像**：7 张 chibi 立绘，一一对应 `titleFor()` 的 7 个称号段位（新手观察员 → 见习生 → 熟练工 → 资深提示工程师 → AI 编排官 → 算力领主 → Token 之神），同一套金桂冠徽章框，随等级自动切换：
+
+![等级头像](docs/levels.png)
+
 - 徽章来自 `MrLukezy/ai-using-achievement` 的 chibi 成就图（MIT），已裁掉透明边、居中方形化并缩到 192px WebP，共 84 张，合计约 1.5 MB。
 - 映射表在 `art.js`（99 条成就 → 84 张徽章，一一对应，无遗漏）；重复使用的徽章只出现在语义相近的成就上。
 - 文件放在 `assets/icons/<name>.webp`，由 Host 的 prefix 路由 `GET /dsh-codequest/icon/<name>.webp` 以 `image/webp` + `immutable` 缓存下发；只接受 `[a-z0-9_]+\.webp`，路径穿越直接 404。
 - 插件图标 `icon.png` 由 `syn_ai_grandmaster` 徽章 + 品牌渐变合成。
 - 卡片按稀有度着色：`common` 灰蓝、`rare` 蓝、`epic` 紫、`legendary` 琥珀；解锁态有描边与光晕，未解锁只降透明度并加 🔒，不再整卡去色。
-- 顶部头像随等级换图（每两级一张），等级徽标叠在头像右下角。
+- 顶部头像按称号段位换图（7 段位 7 张），等级徽标叠在头像右下角；浮层 HUD 用同一张。
+- 等级头像由 HFSY 网关（gpt-image-2）生成，源图 1254px 透明 PNG，落盘时缩到 256px 并留 10% 透明边，单张约 25 KB。
 
 ## 云端排行榜
 
@@ -186,6 +191,7 @@ DSH_SHARED_SECRET="$(openssl rand -hex 24)" JWT_SECRET="$(openssl rand -hex 32)"
 | POST | `/dsh-codequest/cloud/sync` | 推送成就与进度 |
 | POST | `/dsh-codequest/cloud/leaderboard` | 拉取排行榜 |
 | GET | `/dsh-codequest/icon/<name>.webp` | 成就徽章静态图（prefix 路由，7 天 immutable 缓存） |
+| GET | `/dsh-codequest/level/level_<n>.webp` | 等级段位头像（prefix 路由，同上缓存） |
 
 写操作校验 `Origin` 与 `Host` 同源；路由不参与 DSH 的登录网关，公网部署时请把 `/dsh-codequest/` 一并放在网关之后。
 

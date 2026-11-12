@@ -1,6 +1,6 @@
 {
   "name": "dsh-codequest",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "description": "CodeQuest for DeepSeek Harness: achievement game driven by real DSH token traffic and session content, with an optional self-hosted leaderboard.",
@@ -39,6 +39,7 @@
     "cordis.patch.yml",
     "locale/*.json",
     "assets/icons/*.webp",
+    "assets/levels/*.webp",
     "icon.png",
     "README.md",
     "test/*.mjs"
@@ -56,3 +57,4 @@
     }
   }
 }
+

@@ -261,8 +261,23 @@ window.__ModuleLoader__.load({
 
     const CATEGORY_ORDER = ['token', 'interaction', 'time', 'text', 'workplace', 'code', 'mastery', 'easter'];
 
-/** Header avatar: one badge per two levels, so the art grows with the player. */
-const LEVEL_ART = ['first_session', 'bug_fixer_50', 'marathon_session', 'syn_code_veteran', 'syn_ai_grandmaster'];
+/**
+ * Header avatar: one portrait per title tier (7 tiers, matching `titleFor`),
+ * served from `/level/level_<tier>.webp`.
+ */
+function levelTier(level) {
+  if (level >= 40) return 7;
+  if (level >= 30) return 6;
+  if (level >= 22) return 5;
+  if (level >= 15) return 4;
+  if (level >= 10) return 3;
+  if (level >= 6) return 2;
+  return 1;
+}
+
+function levelArtUrl(level) {
+  return `${apiBase()}/level/level_${levelTier(level)}.webp`;
+}
 
     function apiBase() {
       const pathname = window.location.pathname || '/';
@@ -538,7 +553,7 @@ const LEVEL_ART = ['first_session', 'bug_fixer_50', 'marathon_session', 'syn_cod
     function LevelHeader({ data, t }) {
       const p = data.progress;
       const pct = p.levelNeed > 0 ? Math.min(100, (p.levelInto / p.levelNeed) * 100) : 0;
-      const avatar = LEVEL_ART[Math.min(LEVEL_ART.length - 1, Math.max(0, Math.floor((p.level - 1) / 2)))];
+      const avatar = levelArtUrl(p.level);
       return h(
         'div',
         { className: 'cq-head' },
@@ -546,7 +561,7 @@ const LEVEL_ART = ['first_session', 'bug_fixer_50', 'marathon_session', 'syn_cod
           'div',
           { className: 'cq-avatar' },
           h('img', {
-            src: `${apiBase()}/icon/${avatar}.webp`,
+            src: avatar,
             alt: '',
             decoding: 'async',
             onError: (event) => {
@@ -745,7 +760,7 @@ const LEVEL_ART = ['first_session', 'bug_fixer_50', 'marathon_session', 'syn_cod
       const days = lastDays(s.dailyTokens, 14);
       const values = days.map((day) => day.value);
       const pct = p.levelNeed > 0 ? Math.min(100, (p.levelInto / p.levelNeed) * 100) : 0;
-      const avatar = LEVEL_ART[Math.min(LEVEL_ART.length - 1, Math.max(0, Math.floor((p.level - 1) / 2)))];
+      const avatar = levelArtUrl(p.level);
       const hide = (event) => {
         if (event) event.stopPropagation();
         writeHudMode('hidden');
@@ -766,7 +781,7 @@ const LEVEL_ART = ['first_session', 'bug_fixer_50', 'marathon_session', 'syn_cod
                 onClick: () => writeHudMode('open'),
                 title: t('hudOpen'),
               },
-              h('img', { src: `${apiBase()}/icon/${avatar}.webp`, alt: '' }),
+              h('img', { src: avatar, alt: '' }),
               h('b', null, `Lv.${p.level}`),
               h('span', null, fmtTokens(s.tokensToday)),
               h(Sparkline, { values, width: 40, height: 15 }),
@@ -785,7 +800,7 @@ const LEVEL_ART = ['first_session', 'bug_fixer_50', 'marathon_session', 'syn_cod
           h(
             'div',
             { className: 'cq-hudhead' },
-            h('img', { src: `${apiBase()}/icon/${avatar}.webp`, alt: '' }),
+            h('img', { src: avatar, alt: '' }),
             h(
               'div',
               { style: { minWidth: 0, flex: 1 } },
@@ -1604,6 +1619,8 @@ const LEVEL_ART = ['first_session', 'bug_fixer_50', 'marathon_session', 'syn_cod
     };
   },
 });
+
+
 
 
 
