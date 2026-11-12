@@ -53,6 +53,8 @@ dsh-codequest/            ← 插件包根目录（DSH 直接安装这一层）
 两个常驻组件注册在 `shell.overlay`（框架级浮层，点击穿透，只在自己绘制的区域接管指针）：
 
 - **使用曲线 HUD**（右下角）：默认收成小胶囊（等级头像 + `Lv.x` + 今日 Token + 迷你折线），点它展开成完整卡片（近 14 天折线、解锁数、升级进度）；点 `−` 收回、点 `✕` 彻底隐藏，状态记在 `localStorage`，也可在「数据」页的「悬浮窗」开关里重新打开。
+- **可拖动**：按住胶囊或卡片标题栏即可拖到任意位置，位置记在 `localStorage['dsh-codequest.hudpos']`，双击标题栏或点「数据 → 复位位置」回到默认角落。
+- **实时**：HUD 走单独的 `/live` 轻接口（221 字节 vs `/state` 的 95 KB），每 3 秒一次，Token 数变化时会在曲线上飘一个绿色 `+1.2M`。
 - **解锁提示**：成就解锁时右下角弹出 toast（徽章 + 名称 + 积分），6 秒自动消失，点击可立即关闭；最多同时 4 条。
 - 首次加载会以当前解锁集合为基线，**不会把历史成就一次性弹出来**；之后新解锁的才提示。
 - 样式表在插件加载时注入 `<head>`（`#dsh-codequest-style`），因为浮层不在 Conversation 视图的 DOM 树里，视图内联的样式管不到它；模块重载时会替换旧样式表而不是沿用缓存。
@@ -186,6 +188,7 @@ DSH_SHARED_SECRET="$(openssl rand -hex 24)" JWT_SECRET="$(openssl rand -hex 32)"
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/dsh-codequest/state` | 全量状态（统计 + 成就 + 进度 + 云端信息），超过 20s 未扫描会触发一次后台扫描 |
+| GET | `/dsh-codequest/live` | HUD 用的轻量快照（等级 / 积分 / 今日 Token / 连击），约 220 字节；折叠超过 6s 会在后台补一次增量扫描 |
 | GET | `/dsh-codequest/account` | 读取本机已登录的 DeepSeek 身份（供账号页展示） |
 | POST | `/dsh-codequest/cloud/dsh-login` | 用 DeepSeek 身份免密登录排行榜 |
 | POST | `/dsh-codequest/refresh` | 触发扫描，`{force:true}` 强制重建全部折叠 |

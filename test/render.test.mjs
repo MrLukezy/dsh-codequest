@@ -91,6 +91,28 @@ const overlay = walk(views.QuestOverlay({ t }));
 console.log('QuestOverlay: elements=%d images=%d hud=%s', overlay.elements, overlay.images || 0, overlay.elements > 8);
 if (overlay.elements < 8) throw new Error('overlay rendered almost nothing');
 
+// The HUD must consume the /live snapshot and keep a float bubble slot.
+mod.__store.live = {
+  ok: true,
+  tokensToday: 12345678,
+  tokens: 3e9,
+  points: 2280,
+  level: 14,
+  title: '熟练工',
+  unlocked: 86,
+  total: 313,
+  levelInto: 60,
+  levelNeed: 178,
+  streak: 5,
+};
+mod.__store.float = { id: 1, amount: 1234567, at: Date.now() };
+const liveHud = walk(views.QuestOverlay({ t }));
+const liveText = liveHud.text.join(' ');
+if (!liveText.includes('Lv.14')) throw new Error('HUD did not read the live level');
+if (!liveText.includes('12.35M')) throw new Error('HUD did not read the live token count: ' + liveText);
+console.log('QuestHud live: elements=%d', liveHud.elements);
+mod.__store.live = null;
+mod.__store.float = null;
 const unlockedItem = payload.achievements.find((item) => item.unlockedAt && item.art);
 const detail = walk(views.AchievementDetail({ item: unlockedItem, t, onClose: () => {} }));
 console.log('AchievementDetail: elements=%d images=%d', detail.elements, detail.images || 0);

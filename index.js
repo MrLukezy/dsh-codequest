@@ -34,6 +34,8 @@ const DEFAULT_CLOUD_BASE = process.env.DSH_CODEQUEST_CLOUD || '';
 const STATE_VERSION = 1;
 const LIVE_REFRESH_MS = 20_000;
 const AUTO_SCAN_MS = 10 * 60_000;
+/** The HUD polls /live every 3s; a fold older than this gets refreshed. */
+const LIVE_SCAN_MS = 6_000;
 const MAX_BODY_BYTES = 64 * 1024;
 
 /**
@@ -464,6 +466,41 @@ export function apply(ctx) {
           const stale = Date.now() - runtime.lastScanAt > LIVE_REFRESH_MS;
           if (stale && !runtime.scanning) void scan();
           return json(res, 200, { ok: true, build: BUILD, ...statsPayload() });
+        },
+      },
+      {
+        /**
+         * Cheap snapshot for the floating HUD: the full /state payload carries
+         * 300+ achievement rows, which is far too much to poll every few
+         * seconds. This reads the cached evaluation only and never scans.
+         */
+        path: `${PREFIX}/live`,
+        handler: async (req, res) => {
+          if (req.method !== 'GET') return json(res, 405, { ok: false, error: 'method_not_allowed' });
+          if (!sameOrigin(req)) return json(res, 403, { ok: false, error: 'cross_origin' });
+          // Keep the HUD honest: a stale fold is what makes the counter look
+          // frozen, so nudge a scan here too (cheap while idle, incremental).
+          if (Date.now() - runtime.lastScanAt > LIVE_SCAN_MS && !runtime.scanning) void scan();
+          const metrics = metricsNow();
+          const evaluation = evaluationNow();
+          let unlocked = 0;
+          for (const item of evaluation.items) if (item.unlockedAt) unlocked += 1;
+          return json(res, 200, {
+            ok: true,
+            at: Date.now(),
+            tokens: metrics.tokens || 0,
+            tokensToday: metrics.tokensToday || 0,
+            sessions: metrics.sessions || 0,
+            toolCalls: metrics.toolCalls || 0,
+            streak: metrics.maxStreak || 0,
+            points: evaluation.points || 0,
+            level: evaluation.level || 1,
+            title: evaluation.title || '',
+            unlocked,
+            total: ACHIEVEMENTS.length,
+            levelInto: evaluation.levelInto || 0,
+            levelNeed: evaluation.levelNeed || 0,
+          });
         },
       },
       {

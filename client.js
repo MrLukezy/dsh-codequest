@@ -121,10 +121,12 @@ window.__ModuleLoader__.load({
         hudOpen: '展开',
         hudClose: '收起',
         hudHide: '不再显示',
+        hudDrag: '按住拖动可移动，双击回到默认位置',
         show: '显示',
         hide: '隐藏',
         hudShow: '悬浮窗',
-        hudShowHint: '在右下角显示使用曲线',
+        hudShowHint: '在右下角显示使用曲线，可拖动到任意位置',
+        hudReset: '复位位置',
         dshAccount: 'DeepSeek 账号',
         dshLogin: '用 DeepSeek 账号登录排行榜',
         dshLoginDone: '已用 DeepSeek 账号登录',
@@ -245,10 +247,12 @@ window.__ModuleLoader__.load({
         hudOpen: 'Expand',
         hudClose: 'Collapse',
         hudHide: 'Hide',
+        hudDrag: 'Drag to move, double-click to reset',
         show: 'Show',
         hide: 'Hide',
         hudShow: 'Floating HUD',
-        hudShowHint: 'Show the usage curve in the bottom-right corner',
+        hudShowHint: 'Show the usage curve in the bottom-right corner; drag it anywhere',
+        hudReset: 'Reset position',
         dshAccount: 'DeepSeek account',
         dshLogin: 'Sign in to the leaderboard with DeepSeek',
         dshLoginDone: 'Signed in with your DeepSeek account',
@@ -439,6 +443,12 @@ function levelArtUrl(level) {
 .cq-overlay{position:fixed;right:16px;bottom:92px;z-index:60;display:flex;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:none;max-width:min(320px,calc(100vw - 32px))}
 .cq-overlay>*{pointer-events:auto}
 .cq-hud{display:flex;flex-direction:column;align-items:flex-end}
+.cq-drag{cursor:grab;touch-action:none;user-select:none}
+.cq-drag:active{cursor:grabbing}
+.cq-floats{position:absolute;inset:0;pointer-events:none}
+.cq-float{position:absolute;left:50%;top:44%;white-space:nowrap;font-size:12px;font-weight:800;color:#16a34a;letter-spacing:.01em;text-shadow:0 1px 8px rgba(22,163,74,.45);animation:cqFloatUp 1.6s ease-out forwards}
+@keyframes cqFloatUp{0%{opacity:0;transform:translate(-50%,8px) scale(.9)}18%{opacity:1;transform:translate(-50%,-2px) scale(1)}100%{opacity:0;transform:translate(-50%,-32px) scale(1)}}
+.cq-hudpill,.cq-hudcard{position:relative}
 .cq-hudpill{display:flex;align-items:center;gap:2px;border:1px solid var(--dsw-alias-border-l2,#e3e6eb);background:color-mix(in srgb,var(--dsw-alias-bg-layer-1,#fff) 92%,transparent);backdrop-filter:blur(10px);border-radius:999px;padding:3px 4px 3px 5px;box-shadow:0 6px 20px rgba(20,26,40,.14)}
 .cq-hudpillmain{display:flex;align-items:center;gap:6px;border:0;background:none;font:inherit;font-size:11.5px;color:var(--dsw-alias-label-primary,#1f2328);cursor:pointer;padding:2px 3px}
 .cq-hudpillmain img{width:22px;height:22px;border-radius:50%;object-fit:cover}
@@ -554,9 +564,16 @@ function levelArtUrl(level) {
     const questStore = {
       data: null,
       error: null,
+      /** Cheap /live snapshot: drives the HUD between full /state refreshes. */
+      live: null,
+      /** Last token gain, consumed by the HUD as a floating '+N' bubble. */
+      float: null,
+      floatSeq: 0,
       listeners: new Set(),
       timer: 0,
+      liveTimer: 0,
       pending: null,
+      livePending: null,
       async refresh() {
         if (this.pending) return this.pending;
         this.pending = (async () => {
@@ -577,19 +594,51 @@ function levelArtUrl(level) {
         })();
         return this.pending;
       },
+      /**
+       * Poll the tiny /live endpoint. The HUD should feel live (token counter
+       * ticking, floating numbers) without re-downloading 313 achievement rows
+       * every few seconds.
+       */
+      async refreshLive() {
+        if (this.livePending) return this.livePending;
+        this.livePending = (async () => {
+          try {
+            const next = await api('/live');
+            if (!next || !next.ok) return;
+            const prev = this.live;
+            if (prev && Number.isFinite(prev.tokensToday) && Number.isFinite(next.tokensToday)) {
+              const gain = next.tokensToday - prev.tokensToday;
+              if (gain > 0) {
+                this.floatSeq += 1;
+                this.float = { id: this.floatSeq, amount: gain, at: Date.now() };
+              }
+            }
+            this.live = next;
+            for (const listener of [...this.listeners]) listener();
+          } catch {
+            /* offline is not worth surfacing on the HUD */
+          } finally {
+            this.livePending = null;
+          }
+        })();
+        return this.livePending;
+      },
       start() {
         if (this.timer) return;
         this.timer = window.setInterval(() => void this.refresh(), 15_000);
+        this.liveTimer = window.setInterval(() => void this.refreshLive(), 3_000);
         void this.refresh();
-      },
-      subscribe(listener) {
+        void this.refreshLive();
+      },      subscribe(listener) {
         this.listeners.add(listener);
         this.start();
         return () => {
           this.listeners.delete(listener);
-          if (this.listeners.size === 0 && this.timer) {
-            window.clearInterval(this.timer);
+          if (this.listeners.size === 0) {
+            if (this.timer) window.clearInterval(this.timer);
+            if (this.liveTimer) window.clearInterval(this.liveTimer);
             this.timer = 0;
+            this.liveTimer = 0;
           }
         };
       },
@@ -611,7 +660,13 @@ function levelArtUrl(level) {
           off();
         };
       }, []);
-      return { data: questStore.data, error: questStore.error, reload: () => questStore.refresh() };
+      return {
+        data: questStore.data,
+        live: questStore.live,
+        float: questStore.float,
+        error: questStore.error,
+        reload: () => questStore.refresh(),
+      };
     }
 
     function useCodeQuest() {
@@ -816,15 +871,132 @@ function levelArtUrl(level) {
       questStore.notify();
     }
 
-    /** Floating usage curve: a small pill by default, expandable, hideable. */
+    /** Where the user dragged the HUD; null means "keep the default corner". */
+    const HUD_POS_KEY = 'dsh-codequest.hudpos';
+
+    function readHudPos() {
+      try {
+        const raw = window.localStorage.getItem(HUD_POS_KEY);
+        const pos = raw ? JSON.parse(raw) : null;
+        if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.y)) return { x: pos.x, y: pos.y };
+      } catch {
+        /* ignore a corrupt entry */
+      }
+      return null;
+    }
+
+    function writeHudPos(pos) {
+      try {
+        if (pos) window.localStorage.setItem(HUD_POS_KEY, JSON.stringify(pos));
+        else window.localStorage.removeItem(HUD_POS_KEY);
+      } catch {
+        /* private mode: the position just does not survive a reload */
+      }
+    }
+
+    /**
+     * Drag support for the HUD: pointer events, clamped to the viewport, saved
+     * so the box stays where the user put it. Double-click restores the corner.
+     */
+    function useHudDrag() {
+      const [pos, setPos] = useState(readHudPos);
+      const posRef = useRef(pos);
+      const drag = useRef(null);
+
+      const style = pos
+        ? { position: 'fixed', left: `${pos.x}px`, top: `${pos.y}px`, right: 'auto', bottom: 'auto' }
+        : null;
+
+      const onPointerDown = (event) => {
+        if (event.button !== 0) return;
+        if (event.target && event.target.closest && event.target.closest('button')) return;
+        const box = event.currentTarget.getBoundingClientRect();
+        drag.current = { dx: event.clientX - box.left, dy: event.clientY - box.top, w: box.width, h: box.height };
+        try {
+          event.currentTarget.setPointerCapture(event.pointerId);
+        } catch {
+          /* older engines */
+        }
+      };
+
+      const onPointerMove = (event) => {
+        const state = drag.current;
+        if (!state) return;
+        const maxX = Math.max(4, window.innerWidth - state.w - 4);
+        const maxY = Math.max(4, window.innerHeight - state.h - 4);
+        const next = {
+          x: Math.min(Math.max(4, event.clientX - state.dx), maxX),
+          y: Math.min(Math.max(4, event.clientY - state.dy), maxY),
+        };
+        posRef.current = next;
+        setPos(next);
+      };
+
+      const endDrag = () => {
+        if (!drag.current) return;
+        drag.current = null;
+        writeHudPos(posRef.current);
+      };
+
+      const resetPos = () => {
+        posRef.current = null;
+        setPos(null);
+        writeHudPos(null);
+      };
+
+      return {
+        style,
+        handle: {
+          onPointerDown,
+          onPointerMove,
+          onPointerUp: endDrag,
+          onPointerCancel: endDrag,
+          onDoubleClick: resetPos,
+        },
+      };
+    }
+
+    /** A "+1.2M" bubble that floats up and fades out. */
+    function HudFloat({ entry, onDone }) {
+      useEffect(() => {
+        const timer = window.setTimeout(onDone, 1600);
+        return () => window.clearTimeout(timer);
+      }, [onDone]);
+      return h('span', { className: 'cq-float' }, `+${fmtTokens(entry.amount)}`);
+    }
+
+    /** Floating usage curve: a small pill by default, expandable, hideable, draggable. */
     function QuestHud(props) {
       const t = (props && props.t) || pluginT;
-      const { data } = useQuestStore();
+      const { data, live, float } = useQuestStore();
       const mode = readHudMode();
+      const drag = useHudDrag();
+      const [floats, setFloats] = useState([]);
+      const lastFloat = useRef(0);
+
+      // Turn the store's latest token gain into a short-lived bubble.
+      useEffect(() => {
+        if (!float || float.id === lastFloat.current) return;
+        lastFloat.current = float.id;
+        setFloats((list) => [...list.slice(-2), float]);
+      }, [float]);
+
       if (mode === 'hidden' || !data) return null;
 
-      const p = data.progress;
+      const p = live
+        ? {
+            level: live.level,
+            title: live.title,
+            points: live.points,
+            unlocked: live.unlocked,
+            total: live.total,
+            levelInto: live.levelInto,
+            levelNeed: live.levelNeed,
+          }
+        : data.progress;
       const s = data.stats;
+      const tokensToday = live ? live.tokensToday : s.tokensToday;
+      const streak = live ? live.streak : s.maxStreak;
       const days = lastDays(s.dailyTokens, 14);
       const values = days.map((day) => day.value);
       const pct = p.levelNeed > 0 ? Math.min(100, (p.levelInto / p.levelNeed) * 100) : 0;
@@ -833,14 +1005,21 @@ function levelArtUrl(level) {
         if (event) event.stopPropagation();
         writeHudMode('hidden');
       };
+      const bubbles = floats.map((entry) =>
+        h(HudFloat, {
+          key: entry.id,
+          entry,
+          onDone: () => setFloats((list) => list.filter((item) => item.id !== entry.id)),
+        }),
+      );
 
       if (mode === 'pill') {
         return h(
           'div',
-          { className: 'cq-hud' },
+          { className: 'cq-hud', style: drag.style },
           h(
             'div',
-            { className: 'cq-hudpill' },
+            { className: 'cq-hudpill cq-drag', ...drag.handle, title: t('hudDrag') },
             h(
               'button',
               {
@@ -851,29 +1030,30 @@ function levelArtUrl(level) {
               },
               h('img', { src: avatar, alt: '' }),
               h('b', null, `Lv.${p.level}`),
-              h('span', null, fmtTokens(s.tokensToday)),
+              h('span', null, fmtTokens(tokensToday)),
               h(Sparkline, { values, width: 40, height: 15 }),
             ),
             h('button', { type: 'button', className: 'cq-hudx', onClick: hide, title: t('hudHide') }, '✕'),
+            h('div', { className: 'cq-floats' }, bubbles),
           ),
         );
       }
 
       return h(
         'div',
-        { className: 'cq-hud' },
+        { className: 'cq-hud', style: drag.style },
         h(
           'div',
           { className: 'cq-hudcard' },
           h(
             'div',
-            { className: 'cq-hudhead' },
+            { className: 'cq-hudhead cq-drag', ...drag.handle, title: t('hudDrag') },
             h('img', { src: avatar, alt: '' }),
             h(
               'div',
               { style: { minWidth: 0, flex: 1 } },
               h('div', { className: 'cq-hudtitle' }, `Lv.${p.level} ${p.title}`),
-              h('div', { className: 'cq-hudsub' }, `${t('todayTokens')} ${fmtTokens(s.tokensToday)} · ${t('streak')} ${s.maxStreak || 0}`),
+              h('div', { className: 'cq-hudsub' }, `${t('todayTokens')} ${fmtTokens(tokensToday)} · ${t('streak')} ${streak || 0}`),
             ),
             h('button', { type: 'button', className: 'cq-hudx', onClick: () => writeHudMode('pill'), title: t('hudClose') }, '−'),
             h('button', { type: 'button', className: 'cq-hudx', onClick: hide, title: t('hudHide') }, '✕'),
@@ -886,11 +1066,11 @@ function levelArtUrl(level) {
             h('span', null, `${p.points} ${t('points')}`),
           ),
           h('div', { className: 'cq-levelbar' }, h('i', { style: { width: `${pct}%` } })),
-          h('div', { className: 'cq-hudsub', style: { marginTop: '5px' } }, `${t('nextLevel')} ${p.levelNeed - p.levelInto} ${t('points')}`),
+          h('div', { className: 'cq-hudsub', style: { marginTop: '5px' } }, `${t('nextLevel')} ${Math.max(0, p.levelNeed - p.levelInto)} ${t('points')}`),
+          h('div', { className: 'cq-floats' }, bubbles),
         ),
       );
     }
-
     function QuestToast({ entry, t, onDone }) {
       useEffect(() => {
         const timer = window.setTimeout(onDone, 6000);
@@ -1382,6 +1562,18 @@ function levelArtUrl(level) {
               onClick: () => writeHudMode(readHudMode() === 'hidden' ? 'pill' : 'hidden'),
             },
             readHudMode() === 'hidden' ? t('show') : t('hide'),
+          ),
+          h(
+            'button',
+            {
+              className: 'cq-btn',
+              type: 'button',
+              onClick: () => {
+                writeHudPos(null);
+                questStore.notify();
+              },
+            },
+            t('hudReset'),
           ),
         ),
       );
