@@ -38,7 +38,11 @@ window.__ModuleLoader__.load({
         workplace: '职场',
         code: '代码与工具',
         mastery: '精通',
+        explore: '探索与收集',
         easter: '彩蛋',
+        fail: '翻车现场',
+        meta: '自我改造',
+        social: '社交与排行',
         scanning: '扫描会话中',
         scanIdle: '会话已同步',
         refresh: '刷新',
@@ -140,6 +144,10 @@ window.__ModuleLoader__.load({
         code: 'Code & Tools',
         mastery: 'Mastery',
         easter: 'Easter Eggs',
+        explore: 'Exploration',
+        fail: 'Blunders',
+        meta: 'Self-hacking',
+        social: 'Social',
         scanning: 'Scanning sessions',
         scanIdle: 'Sessions synced',
         refresh: 'Refresh',
@@ -259,7 +267,20 @@ window.__ModuleLoader__.load({
       legendary: { color: '#f59e0b', label: 'Legendary' },
     };
 
-    const CATEGORY_ORDER = ['token', 'interaction', 'time', 'text', 'workplace', 'code', 'mastery', 'easter'];
+    const CATEGORY_ORDER = [
+  'token',
+  'interaction',
+  'time',
+  'text',
+  'workplace',
+  'code',
+  'mastery',
+  'explore',
+  'easter',
+  'fail',
+  'meta',
+  'social',
+];
 
 /**
  * Header avatar: one portrait per title tier (7 tiers, matching `titleFor`),
@@ -1619,6 +1640,8 @@ function levelArtUrl(level) {
     };
   },
 });
+
+
 
 
 

@@ -16,7 +16,7 @@ const MAX_PROMPT_CHARS = 600;
  * Bumped when fold semantics change, so cached folds from an older build are
  * discarded and rebuilt instead of being read with the new metric meanings.
  */
-export const FOLD_VERSION = 4;
+export const FOLD_VERSION = 5;
 
 const SENTIMENT_KEYWORDS = {
   praise: ['谢谢', '感谢', '太好了', '完美', '厉害', '牛逼', '牛啊', '真棒', '优秀', '漂亮', '赞', '辛苦了', '给力', '靠谱', 'great', 'thanks', 'thank you', 'perfect', 'awesome', 'nice work', 'well done'],
@@ -87,12 +87,15 @@ export function emptyFold() {
     exts: {},
     cmds: {},
     daily: {},
+    dailyPrompts: {},
+    turnUsage: {},
+    maxTurnTokens: 0,
     hourly: new Array(24).fill(0),
     error: null,
   };
 }
 
-function addUsage(fold, usage, time) {
+function addUsage(fold, usage, time, turn) {
   if (!usage) return;
   const input = Number(usage.inputTokens) || 0;
   const output = Number(usage.outputTokens) || 0;
@@ -112,6 +115,11 @@ function addUsage(fold, usage, time) {
   fold.daily[key] = (fold.daily[key] || 0) + total;
   const hour = new Date(at).getHours();
   fold.hourly[hour] += total;
+  if (typeof turn === 'number') {
+    const seen = (fold.turnUsage[turn] || 0) + total;
+    fold.turnUsage[turn] = seen;
+    if (seen > fold.maxTurnTokens) fold.maxTurnTokens = seen;
+  }
 }
 
 /**
@@ -149,6 +157,8 @@ export function foldSession(header, events) {
         if (text) {
           fold.promptChars += text.length;
           fold.humanPrompts += 1;
+          const promptDay = localDateKey(typeof time === 'number' ? time : Date.now());
+          fold.dailyPrompts[promptDay] = (fold.dailyPrompts[promptDay] || 0) + 1;
           if (fold.prompts.length < MAX_PROMPTS) {
             fold.prompts.push(text.slice(0, MAX_PROMPT_CHARS));
           }
@@ -158,7 +168,7 @@ export function foldSession(header, events) {
         break;
       }
       case 'assistant/message': {
-        addUsage(fold, data.usage, time);
+        addUsage(fold, data.usage, time, data.turn);
         const text = textOf(data.message);
         if (text) {
           fold.assistantChars += text.length;
@@ -261,6 +271,11 @@ export function aggregate(sessions) {
   const activeDates = new Set();
   const dailyTokens = {};
   const dailySessions = {};
+  const dailyPrompts = {};
+  let maxTurnTokens = 0;
+  let maxSessionTurns = 0;
+  let maxSessionErrors = 0;
+  let lateSessions = 0;
   const hourly = new Array(24).fill(0);
   const prompts = [];
   let tokens = 0;
@@ -304,6 +319,12 @@ export function aggregate(sessions) {
     assistantChars += fold.assistantChars || 0;
     codeBlocks += fold.codeBlocks || 0;
     if ((fold.total || 0) > maxSessionTokens) maxSessionTokens = fold.total || 0;
+    if ((fold.maxTurnTokens || 0) > maxTurnTokens) maxTurnTokens = fold.maxTurnTokens || 0;
+    if ((fold.turns || 0) > maxSessionTurns) maxSessionTurns = fold.turns || 0;
+    if ((fold.toolErrors || 0) > maxSessionErrors) maxSessionErrors = fold.toolErrors || 0;
+    for (const [date, count] of Object.entries(fold.dailyPrompts || {})) {
+      dailyPrompts[date] = (dailyPrompts[date] || 0) + (Number(count) || 0);
+    }
     mergeCounts(tools, fold.tools);
     mergeCounts(models, fold.models);
     mergeCounts(providers, fold.providers);
@@ -336,6 +357,7 @@ export function aggregate(sessions) {
       // "Night" covers the evening working block too (20:00+), not only the
       // small hours, so an evening-only habit can still make progress.
       if (hour >= 20 || hour < 5) nightSessions += 1;
+      if (hour < 5) lateSessions += 1;
       if (hour >= 5 && hour < 8) earlySessions += 1;
       const weekday = d.getDay();
       if (weekday === 0 || weekday === 6) weekendSessions += 1;
@@ -347,6 +369,7 @@ export function aggregate(sessions) {
   const todayKey = localDateKey(Date.now());
   const maxDailyTokens = Object.values(dailyTokens).reduce((max, value) => Math.max(max, value), 0);
   const maxDailySessions = Object.values(dailySessions).reduce((max, value) => Math.max(max, value), 0);
+  const maxDailyPrompts = Object.values(dailyPrompts).reduce((max, value) => Math.max(max, value), 0);
   const lateNightTokens = hourly.slice(0, 5).reduce((sum, value) => sum + value, 0);
   const cacheBase = cacheRead + input;
 
@@ -381,6 +404,11 @@ export function aggregate(sessions) {
     maxStreak: longestStreak([...activeDates]),
     maxDailyTokens,
     maxDailySessions,
+    maxDailyPrompts,
+    maxTurnTokens,
+    maxSessionTurns,
+    maxSessionErrors,
+    lateSessions,
     nightSessions,
     earlySessions,
     weekendSessions,
@@ -399,3 +427,7 @@ export function aggregate(sessions) {
     activeDates: [...activeDates].sort(),
   };
 }
+
+
+
+

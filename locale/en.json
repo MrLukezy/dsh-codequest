@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "CodeQuest · DSH Achievements",
-    "description": "Turns real DSH token traffic, session content and tool usage into an achievement game, with an optional self-hosted leaderboard."
+    "description": "Turns real DSH token traffic, session content and tool usage into a 301-achievement game, with an optional self-hosted leaderboard."
   },
   "view": {
     "tab": "CodeQuest"

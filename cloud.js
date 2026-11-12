@@ -108,10 +108,11 @@ export class CloudClient {
     });
   }
 
-  syncAchievements(achievements) {
+  /** @param {boolean} replace when true the list is the whole collection (retires ids) */
+  syncAchievements(achievements, replace = false) {
     return this.request('/sync/achievements', {
       method: 'POST',
-      body: { achievements },
+      body: { achievements, replace },
     });
   }
 

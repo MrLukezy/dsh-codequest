@@ -547,14 +547,26 @@ api.post("/sync/achievements", authMiddleware, syncRateLimit, (req, res) => {
      ON CONFLICT(user_id, achievement_id) DO UPDATE SET
        unlocked_at = MIN(achievements.unlocked_at, excluded.unlocked_at)`
   );
+  // A rebalanced catalog retires ids. `replace: true` lets a client declare
+  // "this list is my whole collection", so retired ids stop inflating the count.
+  const replace = req.body?.replace === true;
   const tx = db.transaction((rows) => {
+    const keep = new Set();
     let n = 0;
     for (const row of rows) {
       const id = String(row?.id || row?.achievementId || "").trim();
       if (!id) continue;
       const at = Number(row?.unlockedAt) || Date.now();
       upsert.run(req.user.id, id, at);
+      keep.add(id);
       n += 1;
+    }
+    if (replace) {
+      const existing = db.prepare("SELECT achievement_id FROM achievements WHERE user_id = ?").all(req.user.id);
+      const drop = db.prepare("DELETE FROM achievements WHERE user_id = ? AND achievement_id = ?");
+      for (const row of existing) {
+        if (!keep.has(row.achievement_id)) drop.run(req.user.id, row.achievement_id);
+      }
     }
     return n;
   });

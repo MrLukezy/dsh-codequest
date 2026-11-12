@@ -23,7 +23,7 @@ export const name = 'dsh-codequest';
 
 const PREFIX = '/dsh-codequest';
 /** Bumped whenever the fold/metrics semantics change; surfaced for diagnostics. */
-const BUILD = '2026-11-12.7';
+const BUILD = '2026-11-13.1';
 const DEFAULT_CLOUD_BASE = 'http://your-host.example/codequest/api';
 const STATE_VERSION = 1;
 const LIVE_REFRESH_MS = 20_000;
@@ -40,7 +40,7 @@ const MAX_BODY_BYTES = 64 * 1024;
  * `DSH_SHARED_SECRET` environment variable. Both sides must match.
  */
 const PLACEHOLDER_SHARED_SECRET = 'change-me-codequest-shared-secret';
-const PLUGIN_VERSION = '0.6.0';
+const PLUGIN_VERSION = '0.7.0';
 
 /** Achievement badges ship with the package and are served as static WebP. */
 const ICON_ROOT = fileURLToPath(new URL('./assets/icons/', import.meta.url));
@@ -70,6 +70,10 @@ function defaultState() {
       dsh: null,
       authMode: null,
       sharedSecret: null,
+      syncCount: 0,
+      bestRank: 0,
+      players: 0,
+      seasonStart: null,
     },
     meta: { firstSeenAt: Date.now() },
   };
@@ -193,7 +197,16 @@ export function apply(ctx) {
     for (const id of Object.keys(state.unlocked)) {
       if (!known.has(id)) delete state.unlocked[id];
     }
-    runtime.evaluation = evaluate(runtime.metrics, state.unlocked);
+    runtime.evaluation = evaluate(runtime.metrics, state.unlocked, Date.now(), {
+      cloud: {
+        loggedIn: Boolean(state.cloud.token),
+        syncs: Number(state.cloud.syncCount) || 0,
+        bestRank: Number(state.cloud.bestRank) || 0,
+        achievements: Number(state.cloud.user && state.cloud.user.achievementCount) || 0,
+        season: Boolean(state.cloud.seasonStart),
+        players: Number(state.cloud.players) || 0,
+      },
+    });
     if (runtime.evaluation.fresh.length > 0) {
       state.unlocked = runtime.evaluation.unlocked;
       save();
@@ -369,9 +382,12 @@ export function apply(ctx) {
     const metrics = metricsNow();
     const evaluation = evaluationNow();
     const achievements = Object.entries(state.unlocked).map(([id, unlockedAt]) => ({ id, unlockedAt }));
-    if (achievements.length > 0) await cloud.syncAchievements(achievements);
+    if (achievements.length > 0) await cloud.syncAchievements(achievements, true);
     const season = await cloud.startSeason(state.cloud.statsEpochMs || Date.now());
-    if (season && season.statsEpochMs) state.cloud.statsEpochMs = season.statsEpochMs;
+    if (season && season.statsEpochMs) {
+      state.cloud.statsEpochMs = season.statsEpochMs;
+      if (!state.cloud.seasonStart) state.cloud.seasonStart = season.statsEpochMs;
+    }
     const progress = progressFromMetrics(metrics);
     const pushed = await cloud.syncProgress(progress);
     state.cloud.lastSyncAt = Date.now();
@@ -635,6 +651,9 @@ export function apply(ctx) {
           if (!sameOrigin(req)) return json(res, 403, { ok: false, error: 'cross_origin' });
           try {
             const result = await pushCloud();
+            state.cloud.syncCount = (Number(state.cloud.syncCount) || 0) + 1;
+            save();
+            recompute();
             return json(res, 200, { ok: true, ...result });
           } catch (error) {
             state.cloud.lastError = String((error && error.message) || error);
@@ -652,7 +671,16 @@ export function apply(ctx) {
           if (!sameOrigin(req)) return json(res, 403, { ok: false, error: 'cross_origin' });
           try {
             const data = await cloud.leaderboard(50);
-            return json(res, 200, { ok: true, items: data.items || [] });
+            const items = data.items || [];
+            state.cloud.players = items.length;
+            const me = state.cloud.user && items.find((row) => row.userId === state.cloud.user.id);
+            if (me && me.rank) {
+              const best = Number(state.cloud.bestRank) || 0;
+              if (!best || me.rank < best) state.cloud.bestRank = me.rank;
+            }
+            save();
+            recompute();
+            return json(res, 200, { ok: true, items });
           } catch (error) {
             return json(res, 200, { ok: false, error: String((error && error.message) || error) });
           }
@@ -742,6 +770,10 @@ export function apply(ctx) {
   recompute();
   ctx.logger?.info?.(`dsh-codequest: ready (${Object.keys(state.sessions).length} cached session(s))`);
 }
+
+
+
+
 
 
 

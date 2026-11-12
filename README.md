@@ -25,7 +25,7 @@ dsh-codequest/            ← 插件包根目录（DSH 直接安装这一层）
 ├─ index.js               Host 半区：扫描会话、算成就、HTTP 路由、免密登录签名
 ├─ client.js              Client 半区：CodeQuest 页 + 浮层 HUD + 解锁提示
 ├─ scan.js / text.js      会话日志折叠与文本信号提取
-├─ achievements.js        99 枚成就定义与等级曲线
+├─ achievements.js        301 枚成就定义与等级曲线
 ├─ art.js                 成就 → 徽章图映射
 ├─ cloud.js               排行榜服务端客户端
 ├─ assets/icons/*.webp    84 张 chibi 徽章（192px）
@@ -41,7 +41,7 @@ dsh-codequest/            ← 插件包根目录（DSH 直接安装这一层）
 
 | 分区 | 内容 |
 | --- | --- |
-| 成就 | 99 枚成就，按 8 个分类**分组展示**（每组带 `已解锁/总数` 与积分进度条），每枚配 chibi 徽章图、稀有度描边与进度条；**点击卡片弹出详情**（达成条件、当前值/目标值、百分比、还差多少、解锁时间） |
+| 成就 | 301 枚成就，按 12 个分类**分组展示**（每组带 `已解锁/总数` 与积分进度条），每枚配 chibi 徽章图、稀有度描边与进度条；**点击卡片弹出详情**（达成条件、当前值/目标值、百分比、还差多少、解锁时间） |
 | 数据 | 最近 30 天流量柱图、常用工具排行、24 小时时段分布、**文本性格**、情绪关键词、常改文件类型、常用命令、模型分布 |
 | 排行榜 | 云端账号的成就数排行（前 50，带头像） |
 | 账号 | **DeepSeek 账号一键登录**、同步、退出、服务器地址配置（邮箱密码作为备用入口） |
@@ -67,7 +67,8 @@ dsh-codequest/            ← 插件包根目录（DSH 直接安装这一层）
 - `tool/call`、`tool/result` → 工具调用次数、工具种类、报错次数
 - `user/message` → **只有 `data.source.kind === 'user'` 才算真人输入**；AGENTS.md、skill 目录、时间快照等注入内容全部排除
 - 真人 prompt 与 AI 回复的文本信号（见下节），只存计数不存正文
-- `turn/start`、`step/start`、事件 `time` → 轮次、时段、活跃天数、连续天数
+- `turn/start`、`step/start`、事件 `time` → 轮次、步骤、时段、活跃天数、连续天数、单次峰值
+- `assistant/message.data.turn` + `usage` → 单轮 Token 峰值；`user/message` 的日期 → 单日 prompt 峰值
 - `SessionHeader.cwd` → 工作目录数量
 
 ## 文本信号
@@ -93,26 +94,28 @@ $DSH_HOME/storages/dsh-codequest/state.json
 
 ## 成就与等级
 
-- 99 枚成就，稀有度 `common / rare / epic / legendary`，分值 5–45。
-- 分类：Token 流量 10 / 交互 9 / 时间 6 / 文本性格 14 / 职场 12 / 代码与工具 22 / 精通 9 / 彩蛋 17。
-- 阈值按本机真实数据分布标定：既有当前就能拿到的，也有需要长期积累的。
-- 隐藏成就（`daily_100m`、`midnight_tokens_10m`）未解锁前显示 `???`。
-- 等级公式：每级所需积分按 1.35 倍递增，起始 40 分；称号从「新手观察员」到「Token 之神」。
+- **301 枚成就**，12 个分类，稀有度 `common / rare / epic / legendary`（59 / 111 / 96 / 35），分值 10 / 20 / 40 / 80。
+- 分类：Token 流量 26 · 交互 26 · 时间 22 · 文本性格 33 · 职场 26 · 代码与工具 35 · 精通 23 · 探索与收集 18 · 彩蛋 31 · 翻车现场 20 · 自我改造 28 · 社交与排行 13。
+- 阈值按本机真实数据标定：入门档是「再走几步就能拿到」，顶端档需要长期积累（例如 32B Token、2000 局会话、40 天连续活跃）。
+- 隐藏成就（如 `daily_1b`、`max_session_200m`、`late_night_40m`）未解锁前显示 `???`。
+- 等级公式：每级需要 `150 + 2×(等级-1)` 分，接近线性，所以等级大致等于完成度；全部 301 枚约 9.4k 分，最后一级「Token 之神」需要约 78% 的积分。
 - 判定是**单调**的：解锁时间一旦写入不会被撤销。
 
-新增成就只需在 `achievements.js` 的 `ACHIEVEMENTS` 里加一条：
+「自我改造」「社交与排行」这两类读的是 DSH 自身的使用痕迹（用了哪些工具）和云端状态（同步次数、历史最高名次、排行榜玩家数），不是会话正文。
+
+新增成就只需在 `achievements.js` 的 `ACHIEVEMENTS` 里加一行：
 
 ```js
-{
-  id: 'my_achievement', name: '名字', desc: '风味文案', cond: '达成条件说明',
-  icon: '🎯', rarity: 'rare', points: 12, category: 'code',
-  target: 100, metric: (m) => m.toolCalls,
-}
+a('my_achievement', '名字', '风味文案', '达成条件说明', '🎯', 'rare', 'code', 100, (m) => m.toolCalls),
+// a(id, name, desc, cond, icon, rarity, category, target, metric, extra?)
+// 分值按稀有度自动取 10/20/40/80，可用 extra.points 覆盖；extra.hidden 标记隐藏成就。
 ```
+
+常用的 metric 简写已经备好：`S('question')` 文本信号、`AI('apology')` AI 回复信号、`F('csharp')` 代码块语言、`X('cs')` 文件扩展名、`C('git')` 命令行工具、`T('edit', 'write')` 工具调用合计、`H(9)` 某小时的消耗。
 
 `m` 是 `scan.js` 的 `aggregate()` 输出（见该文件末尾返回对象），因此新成就通常不需要改采集层。
 
-新成就还要在 `art.js` 里补一行 `'my_achievement': '<徽章名>'`，否则卡片只会显示 emoji 兜底。
+新成就还要在 `art.js` 里补一行 `'my_achievement': '<徽章名>'`，否则卡片只会显示 emoji 兜底。批量加完成就后可以直接重跑 `_cq/make-art-map2.mjs` 重新分配。
 
 ## 美术资源
 
@@ -123,7 +126,7 @@ $DSH_HOME/storages/dsh-codequest/state.json
 ![等级头像](docs/levels.png)
 
 - 徽章来自 `MrLukezy/ai-using-achievement` 的 chibi 成就图（MIT），已裁掉透明边、居中方形化并缩到 192px WebP，共 84 张，合计约 1.5 MB。
-- 映射表在 `art.js`（99 条成就 → 84 张徽章，一一对应，无遗漏）；重复使用的徽章只出现在语义相近的成就上。
+- 映射表在 `art.js`（301 条成就 → 84 张徽章，按 id 家族 + 分类就近分配，84 张全部用上）；重复使用的徽章只出现在语义相近的成就上。
 - 文件放在 `assets/icons/<name>.webp`，由 Host 的 prefix 路由 `GET /dsh-codequest/icon/<name>.webp` 以 `image/webp` + `immutable` 缓存下发；只接受 `[a-z0-9_]+\.webp`，路径穿越直接 404。
 - 插件图标 `icon.png` 由 `syn_ai_grandmaster` 徽章 + 品牌渐变合成。
 - 卡片按稀有度着色：`common` 灰蓝、`rare` 蓝、`epic` 紫、`legendary` 琥珀；解锁态有描边与光晕，未解锁只降透明度并加 🔒，不再整卡去色。
@@ -224,3 +227,4 @@ node test/render.test.mjs
 - 礼貌 / emoji / 咖啡这类信号取决于你的表达习惯，可能长期为 0——它们是彩蛋，不是必拿项。
 - 排行榜只统计成就数，不区分成就分值。
 - 界面文字目前中/英双语硬编码在 `client.js`，`locale/*.json` 只提供插件管理页的标题与描述。
+
