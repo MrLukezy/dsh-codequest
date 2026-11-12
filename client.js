@@ -142,6 +142,12 @@ window.__ModuleLoader__.load({
         etaPrefix: '按你过去几个活跃日的平均速度，大约再',
         etaUnit: '天',
         nextUp: '同分类里最接近的几个',
+        lore: '剧情',
+        loreTitle: '模型的记忆',
+        loreSub: '每解锁一段进度，就会多读到我记得的一点点。',
+        loreSealed: '尚未解锁',
+        loreFoot: '—— 这段文字由本机用量生成，只存在你的机器上',
+        loreToast: '新章节解锁',
         shareCard: '分享这张卡片',
         sharing: '生成链接…',
         copy: '复制',
@@ -315,6 +321,12 @@ window.__ModuleLoader__.load({
         etaPrefix: 'At your average pace, about',
         etaUnit: 'more days',
         nextUp: 'Closest in this category',
+        lore: 'Story',
+        loreTitle: "The model's memory",
+        loreSub: 'Every milestone you clear reveals a little more of what I remember.',
+        loreSealed: 'Still sealed',
+        loreFoot: '— generated from this machine, stored only on this machine',
+        loreToast: 'New chapter',
         shareCard: 'Share this card',
         sharing: 'Creating link…',
         copy: 'Copy',
@@ -681,6 +693,39 @@ function levelArtUrl(level) {
 .cq-sharebox{display:flex;gap:8px;align-items:center;width:100%}
 .cq-sharelink{font-size:11.5px;color:#4d6bfe;text-decoration:none;white-space:nowrap;padding:6px 2px}
 .cq-sharelink:hover{text-decoration:underline}
+/* --- 剧情：图鉴列表 + 阅读视图 --- */
+.cq-lorehero{display:flex;align-items:center;gap:12px;justify-content:space-between;margin-bottom:8px}
+.cq-loreherotitle{font-size:14px;font-weight:800;letter-spacing:.01em}
+.cq-loreherosub{margin-top:3px;font-size:11px;color:var(--dsw-alias-label-secondary,#5b6472);line-height:1.5}
+.cq-loreherocount{flex:none;text-align:right;font-variant-numeric:tabular-nums}
+.cq-loreherocount b{display:block;font-size:17px;font-weight:800}
+.cq-loreherocount span{font-size:10px;color:var(--dsw-alias-label-secondary,#5b6472)}
+.cq-lorebar{position:relative;height:6px;border-radius:999px;background:color-mix(in srgb,var(--dsw-alias-border-l2,#e3e6eb) 85%,transparent);margin-top:6px;max-width:260px}
+.cq-lorebar.big{height:8px;max-width:none;margin-bottom:16px}
+.cq-lorebar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#6366f1,#a855f7);transition:width .6s ease}
+.cq-lorebar span{position:absolute;right:0;top:-15px;font-size:9.5px;color:var(--dsw-alias-label-secondary,#5b6472);font-variant-numeric:tabular-nums}
+.cq-loregroup{margin-top:16px}
+.cq-loregrouptitle{font-size:10.5px;font-weight:800;letter-spacing:.08em;color:var(--dsw-alias-label-secondary,#8a93a3);margin-bottom:6px}
+.cq-lorerow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer;
+  border:1px solid var(--dsw-alias-border-l2,#e3e6eb);background:transparent;border-radius:12px;padding:9px 11px;margin-bottom:6px;transition:.15s}
+.cq-lorerow:hover{border-color:color-mix(in srgb,#6366f1 45%,transparent);background:color-mix(in srgb,#6366f1 4%,transparent)}
+.cq-lorerow.on{background:linear-gradient(120deg,color-mix(in srgb,#6366f1 8%,transparent),transparent 60%)}
+.cq-lorebadge{width:34px;height:34px;flex:none;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;
+  background:color-mix(in srgb,#6366f1 10%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,#6366f1 22%,transparent)}
+.cq-lorerow:not(.on) .cq-lorebadge{filter:grayscale(1);opacity:.6;background:rgba(120,130,150,.1);box-shadow:none}
+.cq-lorechapter{font-size:9.5px;letter-spacing:.08em;color:var(--dsw-alias-label-secondary,#8a93a3)}
+.cq-loretitle{margin-top:2px;font-size:12.5px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cq-lorerow:not(.on) .cq-loretitle{color:var(--dsw-alias-label-secondary,#7b8494);font-weight:550}
+.cq-lorecta{flex:none;font-size:16px;color:var(--dsw-alias-label-secondary,#8a93a3)}
+.cq-lorebox{--cq-r:#6366f1;width:min(520px,100%);background:linear-gradient(165deg,color-mix(in srgb,#6366f1 7%,var(--dsw-alias-bg-layer-1,#fff)),var(--dsw-alias-bg-layer-1,#fff) 60%)}
+.cq-lorehead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.cq-lorekicker{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#6366f1;font-weight:800}
+.cq-loreheading{margin:10px 0 14px;font-size:20px;line-height:1.35;font-weight:800;letter-spacing:.01em}
+.cq-lorebody p{margin:0 0 13px;font-size:13.5px;line-height:1.95;color:var(--dsw-alias-label-primary,#1f2328);
+  font-family:"Songti SC","Noto Serif SC",Georgia,serif}
+.cq-lorebody p:last-child{margin-bottom:0}
+.cq-lorefoot{margin-top:18px;padding-top:12px;border-top:1px dashed var(--dsw-alias-border-l2,#e3e6eb);
+  font-size:10px;color:var(--dsw-alias-label-secondary,#8a93a3);letter-spacing:.04em}
 @keyframes cqPop{0%{transform:scale(.86)}100%{transform:scale(1)}}
 .cq-dshrow{display:flex;align-items:center;gap:10px;margin-top:8px}
 .cq-dshavatar{width:38px;height:38px;border-radius:50%;object-fit:cover;flex:none;box-shadow:0 0 0 2px color-mix(in srgb,#4d6bfe 35%,transparent)}
@@ -1054,6 +1099,27 @@ function levelArtUrl(level) {
       }
     }
 
+    const LORE_SEEN_KEY = 'dsh-codequest.lore-seen';
+
+    function readLoreSeen() {
+      try {
+        const raw = window.localStorage.getItem(LORE_SEEN_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? new Set(parsed) : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function writeLoreSeen(ids) {
+      try {
+        window.localStorage.setItem(LORE_SEEN_KEY, JSON.stringify([...ids]));
+      } catch {
+        /* same fallback as above */
+      }
+    }
+
     /** Set by `apply()` to the locale-bound translator; overlay entries get no props. */
     let pluginT = (key) => DICT.zh[key] || key;
 
@@ -1356,6 +1422,19 @@ function levelArtUrl(level) {
         return () => window.clearTimeout(timer);
       }, [onDone]);
       const item = entry.item;
+      if (entry.kind === 'lore') {
+        return h(
+          'button',
+          { type: 'button', className: 'cq-toast', onClick: onDone, title: item.title },
+          h('div', { className: 'cq-toasticon' }, h('span', null, '📖')),
+          h(
+            'div',
+            { style: { minWidth: 0, flex: 1, textAlign: 'left' } },
+            h('div', { className: 'cq-toasttitle' }, t('loreToast')),
+            h('div', { className: 'cq-toastname' }, item.title),
+          ),
+        );
+      }
       return h(
         'button',
         { type: 'button', className: 'cq-toast', onClick: onDone, title: item.desc },
@@ -1381,6 +1460,7 @@ function levelArtUrl(level) {
       const { data } = useQuestStore();
       const [entries, setEntries] = useState([]);
       const seen = useRef(null);
+      const loreSeen = useRef(null);
 
       useEffect(() => {
         if (!data || !Array.isArray(data.achievements)) return;
@@ -1398,11 +1478,36 @@ function levelArtUrl(level) {
             seen.current = ids;
             writeSeen(ids);
           }
+        } else {
+          for (const item of fresh) seen.current.add(item.id);
+          writeSeen(seen.current);
+          setEntries((prev) => [...fresh.map((item) => ({ key: `${item.id}:${Date.now()}`, kind: 'achievement', item })), ...prev].slice(0, 4));
+        }
+
+        // A story chapter is the bigger reward of the two, so it gets its own
+        // toast even when no achievement popped in the same poll.
+        const lore = data.lore && Array.isArray(data.lore.chapters) ? data.lore.chapters : [];
+        const open = lore.filter((entry) => entry.unlocked);
+        const openIds = new Set(open.map((entry) => entry.id));
+        if (loreSeen.current === null) {
+          const stored = readLoreSeen();
+          loreSeen.current = stored || openIds;
+          if (!stored) writeLoreSeen(openIds);
           return;
         }
-        for (const item of fresh) seen.current.add(item.id);
-        writeSeen(seen.current);
-        setEntries((prev) => [...fresh.map((item) => ({ key: `${item.id}:${Date.now()}`, item })), ...prev].slice(0, 4));
+        const freshLore = open.filter((entry) => !loreSeen.current.has(entry.id));
+        if (freshLore.length === 0) {
+          if (openIds.size !== loreSeen.current.size) {
+            loreSeen.current = openIds;
+            writeLoreSeen(openIds);
+          }
+          return;
+        }
+        for (const entry of freshLore) loreSeen.current.add(entry.id);
+        writeLoreSeen(loreSeen.current);
+        setEntries((prev) =>
+          [...freshLore.map((entry) => ({ key: `lore:${entry.id}:${Date.now()}`, kind: 'lore', item: entry })), ...prev].slice(0, 4),
+        );
       }, [data]);
 
       const dismiss = useCallback((key) => {
@@ -2296,6 +2401,138 @@ function levelArtUrl(level) {
       { key: 'today', field: 'value' },
       { key: 'season', field: 'value' },
     ];
+/**
+     * Fill `{tokens}` style placeholders with this machine's real numbers, so
+     * the same chapter reads differently for every player.
+     */
+    function fillLore(text, data) {
+      if (!text) return '';
+      const stats = (data && data.stats) || {};
+      const progress = (data && data.progress) || {};
+      const cloud = (data && data.cloud) || {};
+      const days = Math.max(1, Number(stats.activeDays) || 1);
+      const perDay = Math.round((Number(stats.tokens) || 0) / days);
+      const table = {
+        tokens: fmtTokens(stats.tokens),
+        today: fmtTokens(stats.tokensToday),
+        days: fmtInt(stats.activeDays),
+        perday: fmtTokens(perDay),
+        sessions: fmtInt(stats.sessions),
+        tools: fmtInt(stats.toolCalls),
+        streak: fmtInt(stats.maxStreak),
+        level: fmtInt(progress.level),
+        players: fmtInt(cloud.players || 0),
+      };
+      return String(text).replace(/\{(\w+)\}/g, (whole, key) => (key in table ? table[key] : whole));
+    }
+
+    /** One chapter row: sealed ones tease the title and the distance left. */
+    function LoreRow({ entry, t, onOpen }) {
+      const pct = entry.progress && entry.progress.need ? Math.min(100, Math.round((entry.progress.now / entry.progress.need) * 100)) : 0;
+      return h(
+        'button',
+        {
+          type: 'button',
+          className: `cq-lorerow${entry.unlocked ? ' on' : ''}`,
+          onClick: () => onOpen(entry),
+        },
+        h(
+          'div',
+          { className: 'cq-lorebadge' },
+          h('span', null, entry.unlocked ? '📖' : '🔒'),
+        ),
+        h(
+          'div',
+          { style: { minWidth: 0, flex: 1, textAlign: 'left' } },
+          h('div', { className: 'cq-lorechapter' }, entry.chapter),
+          h('div', { className: 'cq-loretitle' }, entry.title),
+          entry.unlocked
+            ? null
+            : h(
+                'div',
+                { className: 'cq-lorebar' },
+                h('i', { style: { width: `${pct}%` } }),
+                h('span', null, `${entry.progress.now}/${entry.progress.need}`),
+              ),
+        ),
+        h('span', { className: 'cq-lorecta' }, entry.unlocked ? '›' : ''),
+      );
+    }
+
+    /** The reading view: typography first, no chrome competing with the text. */
+    function LoreReader({ entry, t, data, onClose }) {
+      useEffect(() => {
+        const onKey = (event) => {
+          if (event.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+      }, [onClose]);
+
+      const paragraphs = fillLore(entry.body, data).split('\n\n');
+      return h(
+        'div',
+        { className: 'cq-modal', onClick: onClose },
+        h(
+          'div',
+          { className: 'cq-modalbox cq-lorebox', onClick: (event) => event.stopPropagation(), role: 'dialog', 'aria-modal': 'true' },
+          h(
+            'div',
+            { className: 'cq-lorehead' },
+            h('div', { className: 'cq-lorekicker' }, `${entry.chapter} · ${entry.scopeLabel}`),
+            h('button', { type: 'button', className: 'cq-modalx', onClick: onClose, 'aria-label': t('close') }, '✕'),
+          ),
+          h('h2', { className: 'cq-loreheading' }, entry.title),
+          h('div', { className: 'cq-lorebody' }, paragraphs.map((text, index) => h('p', { key: index }, text))),
+          h('div', { className: 'cq-lorefoot' }, t('loreFoot')),
+        ),
+      );
+    }
+
+    /** 剧情 tab: a codex of the model's memory, unlocked by playing. */
+    function LoreTab({ data, t }) {
+      const [open, setOpen] = useState(null);
+      const lore = (data && data.lore) || { chapters: [], unlocked: 0, total: 0 };
+      const chapters = lore.chapters || [];
+      const pct = lore.total ? Math.round((lore.unlocked / lore.total) * 100) : 0;
+
+      const groups = [];
+      for (const entry of chapters) {
+        const last = groups[groups.length - 1];
+        if (last && last.scope === entry.scope) last.items.push(entry);
+        else groups.push({ scope: entry.scope, label: entry.scopeLabel, items: [entry] });
+      }
+
+      return h(
+        'div',
+        null,
+        h(
+          'div',
+          { className: 'cq-lorehero' },
+          h('div', null,
+            h('div', { className: 'cq-loreherotitle' }, t('loreTitle')),
+            h('div', { className: 'cq-loreherosub' }, t('loreSub')),
+          ),
+          h(
+            'div',
+            { className: 'cq-loreherocount' },
+            h('b', null, `${lore.unlocked}/${lore.total}`),
+            h('span', null, `${pct}%`),
+          ),
+        ),
+        h('div', { className: 'cq-lorebar big' }, h('i', { style: { width: `${pct}%` } })),
+        groups.map((group) =>
+          h(
+            'section',
+            { key: group.scope, className: 'cq-loregroup' },
+            h('div', { className: 'cq-loregrouptitle' }, group.label),
+            group.items.map((entry) => h(LoreRow, { key: entry.id, entry, t, onOpen: setOpen })),
+          ),
+        ),
+        open ? h(LoreReader, { entry: open, t, data, onClose: () => setOpen(null) }) : null,
+      );
+    }
+
 
     function LeaderboardTab({ t, data }) {
       const [board, setBoard] = useState('achievements');
@@ -2679,6 +2916,7 @@ function levelArtUrl(level) {
 
       const tabs = [
         ['achievements', t('achievements')],
+        ['lore', t('lore')],
         ['dashboard', t('dashboard')],
         ['leaderboard', t('leaderboard')],
         ['account', t('account')],
@@ -2719,6 +2957,7 @@ function levelArtUrl(level) {
           ),
         ),
         tab === 'achievements' ? h(AchievementsTab, { data, t }) : null,
+        tab === 'lore' ? h(LoreTab, { data, t }) : null,
         tab === 'dashboard' ? h(DashboardTab, { data, t }) : null,
         tab === 'leaderboard' ? h(LeaderboardTab, { t, data }) : null,
         tab === 'account' ? h(AccountTab, { data, t, reload }) : null,
@@ -2733,6 +2972,8 @@ function levelArtUrl(level) {
         CodeQuestView,
         LevelHeader,
         AchievementsTab,
+        LoreTab,
+        LoreReader,
         DashboardTab,
         LeaderboardTab,
         AccountTab,

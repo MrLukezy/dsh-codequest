@@ -16,6 +16,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ACHIEVEMENTS, CATEGORY_LABELS, evaluate } from './achievements.js';
+import { LORE, loreState } from './lore.js';
 import { aggregate, foldSession, FOLD_VERSION } from './scan.js';
 import { CloudClient, CloudError, progressFromMetrics } from './cloud.js';
 
@@ -393,6 +394,7 @@ export function apply(ctx) {
       },
       achievements: evaluation.items,
       categories: CATEGORY_LABELS,
+      lore: loreState(evaluation),
       cloud: {
         base: state.cloud.base,
         loggedIn: Boolean(state.cloud.token),

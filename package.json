@@ -1,6 +1,6 @@
 {
   "name": "dsh-codequest",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "description": "CodeQuest for DeepSeek Harness: achievement game driven by real DSH token traffic and session content, with an optional self-hosted leaderboard.",
@@ -32,6 +32,7 @@
     "index.js",
     "client.js",
     "achievements.js",
+    "lore.js",
     "art.js",
     "scan.js",
     "text.js",
