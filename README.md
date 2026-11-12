@@ -66,8 +66,9 @@ dsh-codequest/            ← 插件包根目录（DSH 直接安装这一层）
 
 两个常驻组件注册在 `shell.overlay`（框架级浮层，点击穿透，只在自己绘制的区域接管指针）：
 
-- **使用曲线 HUD**（右下角）：默认收成小胶囊（等级头像 + `Lv.x` + 今日 Token + 迷你折线），点它展开成完整卡片（近 14 天折线、解锁数、升级进度）；点 `−` 收回、点 `✕` 彻底隐藏，状态记在 `localStorage`，也可在「数据」页的「悬浮窗」开关里重新打开。
-- **可拖动**：按住胶囊或卡片标题栏即可拖到任意位置，位置记在 `localStorage['dsh-codequest.hudpos']`，双击标题栏或点「数据 → 复位位置」回到默认角落。
+- **使用曲线 HUD**（右下角）：默认收成小胶囊（等级头像 + `Lv.x` + 今日 Token + 迷你折线），点它展开成完整卡片（近 14 天折线、解锁数、升级进度）；点 `−` 收回。
+- **默认开启，重启后仍在**：`✕` 只关闭当前这一次视图（不写任何持久状态），刷新或重启 DSH 会自动回来。想彻底关掉用「数据 → 悬浮窗」里的三档开关（胶囊 / 展开 / 关闭），它存在 Host 的 `state.json` 里（`prefs.hud`），换浏览器、重装插件都跟着走。
+- **可拖动**：按住胶囊或卡片标题栏即可拖到任意位置，位置记在 `localStorage['dsh-codequest.hudpos']`，双击标题栏或点「数据 → 复位位置」回到默认角落；窗口变小、记住的坐标跑到屏幕外时会自动回到默认角落，不会出现「窗口在但看不见」。
 - **实时**：HUD 走单独的 `/live` 轻接口（221 字节 vs `/state` 的 95 KB），每 3 秒一次，Token 数变化时会在曲线上飘一个绿色 `+1.2M`。
 - **解锁提示**：成就解锁时右下角弹出 toast（徽章 + 名称 + 积分），6 秒自动消失，点击可立即关闭；最多同时 4 条。
 - 首次加载会以当前解锁集合为基线，**不会把历史成就一次性弹出来**；之后新解锁的才提示。
@@ -226,7 +227,7 @@ DSH_SHARED_SECRET="$(openssl rand -hex 24)" JWT_SECRET="$(openssl rand -hex 32)"
 | GET | `/dsh-codequest/account` | 读取本机已登录的 DeepSeek 身份（供账号页展示） |
 | POST | `/dsh-codequest/cloud/dsh-login` | 用 DeepSeek 身份免密登录排行榜 |
 | POST | `/dsh-codequest/refresh` | 触发扫描，`{force:true}` 强制重建全部折叠 |
-| POST | `/dsh-codequest/config` | 修改 `{cloudBase, sharedSecret}` |
+| POST | `/dsh-codequest/config` | 修改 `{cloudBase, sharedSecret, hud}`；`hud` 取 `pill` / `open` / `off` |
 | POST | `/dsh-codequest/cloud/login` / `register` / `logout` | 账号操作 |
 | POST | `/dsh-codequest/cloud/sync` | 推送成就与进度 |
 | GET | `/dsh-codequest/cloud/devices` | 当前账号的登录设备列表 |

@@ -37,6 +37,8 @@ const AUTO_SCAN_MS = 10 * 60_000;
 /** The HUD polls /live every 3s; a fold older than this gets refreshed. */
 const LIVE_SCAN_MS = 6_000;
 const MAX_BODY_BYTES = 64 * 1024;
+/** Accepted values for the floating-card preference (`prefs.hud`). */
+const HUD_MODES = new Set(['pill', 'open', 'off']);
 
 /**
  * Shared secret with codequest-server's `DSH_SHARED_SECRET`. The Host signs the
@@ -83,6 +85,12 @@ function defaultState() {
       players: 0,
       seasonStart: null,
     },
+    /**
+     * Interface preferences that must survive a restart, because they live in
+     * the browser otherwise and a reinstall or a new browser loses them.
+     * `hud`: 'pill' | 'open' | 'off' — the floating card's default form.
+     */
+    prefs: { hud: 'pill' },
     meta: { firstSeenAt: Date.now() },
   };
 }
@@ -99,6 +107,7 @@ function loadState() {
       sessions: parsed.sessions && typeof parsed.sessions === 'object' ? parsed.sessions : {},
       unlocked: parsed.unlocked && typeof parsed.unlocked === 'object' ? parsed.unlocked : {},
       cloud: { ...base.cloud, ...(parsed.cloud || {}) },
+      prefs: { ...base.prefs, ...(parsed.prefs || {}) },
       meta: { ...base.meta, ...(parsed.meta || {}) },
     };
   } catch {
@@ -390,6 +399,7 @@ export function apply(ctx) {
         hasSecret: Boolean(state.cloud.sharedSecret),
         boards: state.cloud.boards || {},
       },
+      prefs: { hud: state.prefs.hud },
     };
   }
 
@@ -550,11 +560,20 @@ export function apply(ctx) {
             state.cloud.sharedSecret = secret || null;
             save();
           }
+          // Floating-card preference: the only knob that has to survive a
+          // restart even when the browser storage is wiped.
+          if (typeof body.hud === 'string') {
+            const hud = body.hud.trim();
+            if (!HUD_MODES.has(hud)) return json(res, 400, { ok: false, error: 'invalid_hud' });
+            state.prefs.hud = hud;
+            save();
+          }
           return json(res, 200, {
             ok: true,
             base: state.cloud.base,
             hasSecret: Boolean(state.cloud.sharedSecret),
-        boards: state.cloud.boards || {},
+            boards: state.cloud.boards || {},
+            hud: state.prefs.hud,
           });
         },
       },

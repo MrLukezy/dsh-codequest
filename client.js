@@ -140,7 +140,10 @@ window.__ModuleLoader__.load({
         show: '显示',
         hide: '隐藏',
         hudShow: '悬浮窗',
-        hudShowHint: '在右下角显示使用曲线，可拖动到任意位置',
+        hudShowHint: '右下角的使用曲线，可拖动到任意位置；默认开启，重启 DSH 后仍在',
+        hudModePill: '胶囊',
+        hudModeOpen: '展开',
+        hudModeOff: '关闭',
         hudReset: '复位位置',
         dshAccount: 'DeepSeek 账号',
         dshLogin: '用 DeepSeek 账号登录排行榜',
@@ -290,7 +293,10 @@ window.__ModuleLoader__.load({
         show: 'Show',
         hide: 'Hide',
         hudShow: 'Floating HUD',
-        hudShowHint: 'Show the usage curve in the bottom-right corner; drag it anywhere',
+        hudShowHint: 'The usage curve in the bottom-right corner; drag it anywhere. On by default and back after a restart.',
+        hudModePill: 'Pill',
+        hudModeOpen: 'Expanded',
+        hudModeOff: 'Off',
         hudReset: 'Reset position',
         dshAccount: 'DeepSeek account',
         dshLogin: 'Sign in to the leaderboard with DeepSeek',
@@ -944,6 +950,8 @@ function levelArtUrl(level) {
     }
 
     const HUD_KEY = 'dsh-codequest.hud';
+    /** Closing the card is per-view only, so a restart always brings it back. */
+    let hudHiddenHere = false;
     const SEEN_KEY = 'dsh-codequest.seen';
 
     function readSeen() {
@@ -968,33 +976,93 @@ function levelArtUrl(level) {
     /** Set by `apply()` to the locale-bound translator; overlay entries get no props. */
     let pluginT = (key) => DICT.zh[key] || key;
 
-    /** `hidden` | `pill` | `open` — remembered per browser. */
+    /** Persisted default from the Host (`prefs.hud`): `pill` | `open` | `off`. */
+    function hudPref() {
+      const prefs = questStore.data && questStore.data.prefs;
+      const value = prefs && typeof prefs.hud === 'string' ? prefs.hud : 'pill';
+      return value === 'off' || value === 'open' ? value : 'pill';
+    }
+
+    /**
+     * `hidden` | `pill` | `open`.
+     *
+     * Precedence: the Host preference is the master switch (`off` keeps it
+     * hidden for good). Closing the card only hides it for the current view —
+     * a reload or a DSH restart brings it back, because a floating window that
+     * stays gone with no obvious way to restore it reads as a bug. Only the
+     * form (pill / open) is remembered per browser.
+     */
     function readHudMode() {
+      const pref = hudPref();
+      if (pref === 'off' || hudHiddenHere) return 'hidden';
       try {
         const raw = window.localStorage.getItem(HUD_KEY);
-        return raw === 'hidden' || raw === 'open' ? raw : 'pill';
+        if (raw === 'open' || raw === 'pill') return raw;
       } catch {
-        return 'pill';
+        /* private mode falls back to the preference */
       }
+      return pref;
     }
 
     function writeHudMode(mode) {
-      try {
-        window.localStorage.setItem(HUD_KEY, mode);
-      } catch {
-        /* private mode: the choice just does not survive a reload */
+      if (mode === 'hidden') {
+        hudHiddenHere = true;
+      } else {
+        hudHiddenHere = false;
+        try {
+          window.localStorage.setItem(HUD_KEY, mode === 'open' ? 'open' : 'pill');
+        } catch {
+          /* private mode: the form just does not survive a reload */
+        }
       }
       questStore.notify();
+    }
+
+    /** Change the Host-side default, so it survives restarts and other browsers. */
+    async function setHudPref(value) {
+      const next = value === 'off' || value === 'open' ? value : 'pill';
+      hudHiddenHere = false;
+      if (questStore.data) questStore.data.prefs = { ...(questStore.data.prefs || {}), hud: next };
+      try {
+        window.localStorage.setItem(HUD_KEY, next === 'off' ? 'pill' : next);
+      } catch {
+        /* private mode: the Host copy is still authoritative */
+      }
+      questStore.notify();
+      try {
+        await api('/config', { hud: next });
+      } finally {
+        void questStore.refresh();
+      }
     }
 
     /** Where the user dragged the HUD; null means "keep the default corner". */
     const HUD_POS_KEY = 'dsh-codequest.hudpos';
 
+    /**
+     * A remembered position is only usable while the window is still big
+     * enough to hold it. Shrinking the window (or restarting into a smaller
+     * one) used to leave the card parked outside the viewport, which reads as
+     * "the floating window disappeared".
+     */
+    function clampHudPos(pos) {
+      if (!pos) return null;
+      const width = window.innerWidth || 0;
+      const height = window.innerHeight || 0;
+      if (!width || !height) return pos;
+      const maxX = Math.max(4, width - 140);
+      const maxY = Math.max(4, height - 100);
+      if (pos.x < 0 || pos.y < 0 || pos.x > maxX || pos.y > maxY) return null;
+      return pos;
+    }
+
     function readHudPos() {
       try {
         const raw = window.localStorage.getItem(HUD_POS_KEY);
         const pos = raw ? JSON.parse(raw) : null;
-        if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.y)) return { x: pos.x, y: pos.y };
+        if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.y)) {
+          return clampHudPos({ x: pos.x, y: pos.y });
+        }
       } catch {
         /* ignore a corrupt entry */
       }
@@ -1018,6 +1086,20 @@ function levelArtUrl(level) {
       const [pos, setPos] = useState(readHudPos);
       const posRef = useRef(pos);
       const drag = useRef(null);
+
+      // A resize can strand the card outside the viewport; fall back to the
+      // default corner instead of leaving an invisible floating window.
+      useEffect(() => {
+        const onResize = () => {
+          if (!posRef.current) return;
+          if (clampHudPos(posRef.current)) return;
+          posRef.current = null;
+          setPos(null);
+          writeHudPos(null);
+        };
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+      }, []);
 
       const style = pos
         ? { position: 'fixed', left: `${pos.x}px`, top: `${pos.y}px`, right: 'auto', bottom: 'auto' }
@@ -1874,15 +1956,26 @@ function levelArtUrl(level) {
                 { style: { minWidth: 0, flex: 1 } },
                 h('div', { style: { fontSize: '12px', fontWeight: 700 } }, t('hudShow')),
                 h('div', { className: 'cq-note' }, t('hudShowHint')),
-              ),
-              h(
-                'button',
-                {
-                  className: 'cq-btn',
-                  type: 'button',
-                  onClick: () => writeHudMode(readHudMode() === 'hidden' ? 'pill' : 'hidden'),
-                },
-                readHudMode() === 'hidden' ? t('show') : t('hide'),
+                h(
+                  'div',
+                  { className: 'cq-chips', style: { marginTop: '8px' } },
+                  [
+                    ['pill', t('hudModePill')],
+                    ['open', t('hudModeOpen')],
+                    ['off', t('hudModeOff')],
+                  ].map(([value, label]) =>
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        key: value,
+                        className: `cq-fchip${hudPref() === value ? ' on' : ''}`,
+                        onClick: () => void setHudPref(value),
+                      },
+                      label,
+                    ),
+                  ),
+                ),
               ),
               h(
                 'button',
@@ -2345,6 +2438,8 @@ function levelArtUrl(level) {
       },
       /** Test seam: lets the packaged render test seed a snapshot. */
       __store: questStore,
+      /** Test seam: floating-card visibility rules (they must survive a restart). */
+      __hud: { readHudMode, writeHudMode, hudPref, clampHudPos },
       apply(ctx) {
         let t = (key) => (DICT.zh[key] || key);
         try {
