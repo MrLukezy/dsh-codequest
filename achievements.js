@@ -396,18 +396,18 @@ export const ACHIEVEMENTS = [
   a('social_guild', '小圈子', '排行榜玩家数 ≥ 5', '排行榜玩家数 ≥ 5', '👥', 'epic', 'social', 5, (m) => (m.cloud && m.cloud.players) || 0),
   a('social_offline', '断网也能玩', '从未登录排行榜，纯本地 100 枚', '未登录但本地解锁 ≥ 100 枚', '📴', 'rare', 'social', 1, (m) => (m.cloud && !m.cloud.loggedIn && m.localUnlocked >= 100 ? 1 : 0)),
   // ── 系列完成奖励：把一整类点亮 ────────────────────────────────
-  a('series_token', 'Token 收藏家', 'Token 流量这一整类都被你点亮了', '点亮「Token 流量」全部成就', '🏆', 'legendary', 'token', 1, (m) => (m.categoryUnlocks.token >= m.categoryTotal.token - 1 ? 1 : 0)),
-  a('series_interaction', '社交达人', '交互这一整类都被你点亮了', '点亮「交互」全部成就', '🏆', 'legendary', 'interaction', 1, (m) => (m.categoryUnlocks.interaction >= m.categoryTotal.interaction - 1 ? 1 : 0)),
-  a('series_time', '时间领主', '时间这一整类都被你点亮了', '点亮「时间」全部成就', '🏆', 'legendary', 'time', 1, (m) => (m.categoryUnlocks.time >= m.categoryTotal.time - 1 ? 1 : 0)),
-  a('series_text', '语言学家', '文本性格这一整类都被你点亮了', '点亮「文本性格」全部成就', '🏆', 'legendary', 'text', 1, (m) => (m.categoryUnlocks.text >= m.categoryTotal.text - 1 ? 1 : 0)),
-  a('series_workplace', '职场王者', '职场这一整类都被你点亮了', '点亮「职场」全部成就', '🏆', 'legendary', 'workplace', 1, (m) => (m.categoryUnlocks.workplace >= m.categoryTotal.workplace - 1 ? 1 : 0)),
-  a('series_code', '代码宗师', '代码与工具这一整类都被你点亮了', '点亮「代码与工具」全部成就', '🏆', 'legendary', 'code', 1, (m) => (m.categoryUnlocks.code >= m.categoryTotal.code - 1 ? 1 : 0)),
-  a('series_mastery', '全知全能', '精通这一整类都被你点亮了', '点亮「精通」全部成就', '🏆', 'legendary', 'mastery', 1, (m) => (m.categoryUnlocks.mastery >= m.categoryTotal.mastery - 1 ? 1 : 0)),
-  a('series_explore', '探险家', '探索与收集这一整类都被你点亮了', '点亮「探索与收集」全部成就', '🏆', 'legendary', 'explore', 1, (m) => (m.categoryUnlocks.explore >= m.categoryTotal.explore - 1 ? 1 : 0)),
-  a('series_easter', '彩蛋猎人', '彩蛋这一整类都被你点亮了', '点亮「彩蛋」全部成就', '🏆', 'legendary', 'easter', 1, (m) => (m.categoryUnlocks.easter >= m.categoryTotal.easter - 1 ? 1 : 0)),
-  a('series_fail', '翻车之王', '翻车现场这一整类都被你点亮了', '点亮「翻车现场」全部成就', '🏆', 'legendary', 'fail', 1, (m) => (m.categoryUnlocks.fail >= m.categoryTotal.fail - 1 ? 1 : 0)),
-  a('series_meta', '自我进化', '自我改造这一整类都被你点亮了', '点亮「自我改造」全部成就', '🏆', 'legendary', 'meta', 1, (m) => (m.categoryUnlocks.meta >= m.categoryTotal.meta - 1 ? 1 : 0)),
-  a('series_social', '社交之星', '社交与排行这一整类都被你点亮了', '点亮「社交与排行」全部成就', '🏆', 'legendary', 'social', 1, (m) => (m.categoryUnlocks.social >= m.categoryTotal.social - 1 ? 1 : 0)),
+  a('series_token', 'Token 收藏家', 'Token 流量这一整类都被你点亮了', '点亮「Token 流量」全部成就', '🏆', 'legendary', 'token', 1, (m) => m.categoryUnlocks.token || 0, { targetOf: (m) => Math.max(1, (m.categoryTotal.token || 1) - 1) }),
+  a('series_interaction', '社交达人', '交互这一整类都被你点亮了', '点亮「交互」全部成就', '🏆', 'legendary', 'interaction', 1, (m) => m.categoryUnlocks.interaction || 0, { targetOf: (m) => Math.max(1, (m.categoryTotal.interaction || 1) - 1) }),
+  a('series_time', '时间领主', '时间这一整类都被你点亮了', '点亮「时间」全部成就', '🏆', 'legendary', 'time', 1, (m) => m.categoryUnlocks.time || 0, { targetOf: (m) => Math.max(1, (m.categoryTotal.time || 1) - 1) }),
+  a('series_text', '语言学家', '文本性格这一整类都被你点亮了', '点亮「文本性格」全部成就', '🏆', 'legendary', 'text', 1, (m) => m.categoryUnlocks.text || 0, { targetOf: (m) => Math.max(1, (m.categoryTotal.text || 1) - 1) }),
+  a('series_workplace', '职场王者', '职场这一整类都被你点亮了', '点亮「职场」全部成就', '🏆', 'legendary', 'workplace', 1, (m) => m.categoryUnlocks.workplace || 0, { targetOf: (m) => Math.max(1, (m.categoryTotal.workplace || 1) - 1) }),
+  a('series_code', '代码宗师', '代码与工具这一整类都被你点亮了', '点亮「代码与工具」全部成就', '🏆', 'legendary', 'code', 1, (m) => m.categoryUnlocks.code || 0, { targetOf: (m) => Math.max(1, (m.categoryTotal.code || 1) - 1) }),
+  a('series_mastery', '全知全能', '精通这一整类都被你点亮了', '点亮「精通」全部成就', '🏆', 'legendary', 'mastery', 1, (m) => m.categoryUnlocks.mastery || 0, { targetOf: (m) => Math.max(1, (m.categoryTotal.mastery || 1) - 1) }),
+  a('series_explore', '探险家', '探索与收集这一整类都被你点亮了', '点亮「探索与收集」全部成就', '🏆', 'legendary', 'explore', 1, (m) => m.categoryUnlocks.explore || 0, { targetOf: (m) => Math.max(1, (m.categoryTotal.explore || 1) - 1) }),
+  a('series_easter', '彩蛋猎人', '彩蛋这一整类都被你点亮了', '点亮「彩蛋」全部成就', '🏆', 'legendary', 'easter', 1, (m) => m.categoryUnlocks.easter || 0, { targetOf: (m) => Math.max(1, (m.categoryTotal.easter || 1) - 1) }),
+  a('series_fail', '翻车之王', '翻车现场这一整类都被你点亮了', '点亮「翻车现场」全部成就', '🏆', 'legendary', 'fail', 1, (m) => m.categoryUnlocks.fail || 0, { targetOf: (m) => Math.max(1, (m.categoryTotal.fail || 1) - 1) }),
+  a('series_meta', '自我进化', '自我改造这一整类都被你点亮了', '点亮「自我改造」全部成就', '🏆', 'legendary', 'meta', 1, (m) => m.categoryUnlocks.meta || 0, { targetOf: (m) => Math.max(1, (m.categoryTotal.meta || 1) - 1) }),
+  a('series_social', '社交之星', '社交与排行这一整类都被你点亮了', '点亮「社交与排行」全部成就', '🏆', 'legendary', 'social', 1, (m) => m.categoryUnlocks.social || 0, { targetOf: (m) => Math.max(1, (m.categoryTotal.social || 1) - 1) }),
 ];
 const BY_ID = new Map(ACHIEVEMENTS.map((def) => [def.id, def]));
 
@@ -462,9 +462,14 @@ export function evaluate(metrics, unlockedAt, now = Date.now(), extra = {}) {
       localUnlocked += 1;
     }
   }
+  const categoryTotal = {};
+  for (const def of ACHIEVEMENTS) {
+    categoryTotal[def.category] = (categoryTotal[def.category] || 0) + 1;
+  }
   const enriched = {
     ...metrics,
     categoryUnlocks,
+    categoryTotal,
     localUnlocked,
     cloud: extra.cloud || metrics.cloud || null,
   };
@@ -476,7 +481,10 @@ export function evaluate(metrics, unlockedAt, now = Date.now(), extra = {}) {
     } catch {
       value = 0;
     }
-    const ratio = def.target > 0 ? Math.min(1, value / def.target) : 0;
+    // A few achievements (series completion) derive their target from the
+    // live catalog instead of a constant.
+    const target = typeof def.targetOf === 'function' ? Number(def.targetOf(enriched)) || def.target : def.target;
+    const ratio = target > 0 ? Math.min(1, value / target) : 0;
     const already = typeof unlocked[def.id] === 'number';
     const hit = already || ratio >= 1;
     if (hit && !already) {
@@ -495,7 +503,7 @@ export function evaluate(metrics, unlockedAt, now = Date.now(), extra = {}) {
       category: def.category,
       points: def.points,
       hidden: Boolean(def.hidden),
-      target: def.target,
+      target,
       value: Math.round(value),
       ratio: Number(ratio.toFixed(4)),
       unlockedAt: hit ? unlocked[def.id] : null,
@@ -519,5 +527,7 @@ export function evaluate(metrics, unlockedAt, now = Date.now(), extra = {}) {
 export function achievementById(id) {
   return BY_ID.get(id);
 }
+
+
 
 
