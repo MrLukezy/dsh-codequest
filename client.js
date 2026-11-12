@@ -91,6 +91,10 @@ window.__ModuleLoader__.load({
         login: '登录',
         register: '注册',
         logout: '退出登录',
+      devices: '登录设备',
+      thisDevice: '含当前设备',
+      revokeOthers: '退出其它设备',
+      revokedOthers: '其它设备已退出',
         email: '邮箱',
         password: '密码',
         displayName: '昵称（可选）',
@@ -234,6 +238,10 @@ window.__ModuleLoader__.load({
         login: 'Log in',
         register: 'Sign up',
         logout: 'Log out',
+      devices: 'Devices',
+      thisDevice: 'including this one',
+      revokeOthers: 'Sign out others',
+      revokedOthers: 'Other devices signed out',
         email: 'Email',
         password: 'Password',
         displayName: 'Display name (optional)',
@@ -471,6 +479,9 @@ function levelArtUrl(level) {
 .cq-prog{height:4px;border-radius:999px;background:color-mix(in srgb,var(--dsw-alias-label-secondary,#5b6472) 16%,transparent);margin-top:6px;overflow:hidden}
 .cq-prog i{display:block;height:100%;background:var(--cq-r)}
 .cq-meta{font-size:9.5px;color:var(--dsw-alias-label-secondary,#5b6472);margin-top:3px;font-variant-numeric:tabular-nums}
+.cq-devrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px}
+.cq-devlabel{font-size:12px;font-weight:800;color:var(--dsw-alias-label-primary,#1f2328)}
+.cq-devrow .cq-btn{margin-left:auto}
 .cq-card{cursor:pointer;transition:transform .18s cubic-bezier(.2,.8,.3,1),box-shadow .22s ease,border-color .22s ease}
 .cq-card:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--cq-r) 70%,transparent);box-shadow:0 10px 26px color-mix(in srgb,var(--cq-r) 26%,transparent)}
 .cq-card::after{content:'';position:absolute;top:0;left:-45%;width:45%;height:100%;pointer-events:none;opacity:0;transform:skewX(-14deg);background:linear-gradient(105deg,transparent,rgba(255,255,255,.62),transparent)}
@@ -2004,6 +2015,23 @@ function levelArtUrl(level) {
         };
       }, []);
 
+
+      // Multi-device: how many machines are signed in to this account.
+      const [devices, setDevices] = useState(null);
+      const loadDevices = useCallback(async () => {
+        if (!data.cloud.loggedIn) return;
+        try {
+          const result = await api('/cloud/devices');
+          if (result && result.ok) setDevices(result.items || []);
+        } catch {
+          /* offline is fine: the list is informational */
+        }
+      }, [data.cloud.loggedIn]);
+
+      useEffect(() => {
+        void loadDevices();
+      }, [loadDevices]);
+
       const call = useCallback(
         async (path, body, okText) => {
           setBusy(true);
@@ -2111,6 +2139,38 @@ function levelArtUrl(level) {
           message ? h('div', { className: 'cq-note', style: { marginTop: '8px' } }, message) : null,
           data.cloud.lastError ? h('div', { className: 'cq-err', style: { marginTop: '6px' } }, data.cloud.lastError) : null,
         ),
+          loggedIn && devices && devices.length > 0
+            ? h(
+                'div',
+                { className: 'cq-panel cq-devrow' },
+                h(
+                  'span',
+                  { className: 'cq-devlabel' },
+                  `${t('devices')} ${devices.length}`,
+                ),
+                h(
+                  'span',
+                  { className: 'cq-note' },
+                  devices.some((d) => d.current) ? t('thisDevice') : '',
+                ),
+                devices.length > 1
+                  ? h(
+                      'button',
+                      {
+                        className: 'cq-btn',
+                        type: 'button',
+                        disabled: busy,
+                        onClick: () =>
+                          void (async () => {
+                            await call('/cloud/devices/revoke', {}, t('revokedOthers'));
+                            await loadDevices();
+                          })(),
+                      },
+                      t('revokeOthers'),
+                    )
+                  : null,
+              )
+            : null,
         h(
           'div',
           { className: 'cq-panel' },

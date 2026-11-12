@@ -62,8 +62,12 @@ CREATE TABLE IF NOT EXISTS sessions (
 CREATE TABLE IF NOT EXISTS achievements (
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   achievement_id TEXT NOT NULL,
+  -- Which install reported it. Two machines on one account each keep their own
+  -- rows; the user's collection is the union, so a fresh laptop cannot wipe a
+  -- desktop's progress.
+  device_id TEXT NOT NULL DEFAULT '',
   unlocked_at INTEGER NOT NULL,
-  PRIMARY KEY (user_id, achievement_id)
+  PRIMARY KEY (user_id, achievement_id, device_id)
 );
 
 CREATE TABLE IF NOT EXISTS minigame_scores (
@@ -104,6 +108,35 @@ for (const col of [
 db.exec(
   "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_dsh ON users(dsh_account_id)"
 );
+
+/**
+ * 迁移：成就表增加设备维度。
+ * 老库的 `achievements` 主键是 (user_id, achievement_id)，无法原地加列，
+ * 因此重建表并把已有行归到 device_id='' 名下（等价于「旧设备」）。
+ */
+{
+  const columns = db.prepare("PRAGMA table_info(achievements)").all().map((c) => c.name);
+  if (!columns.includes("device_id")) {
+    const migrate = db.transaction(() => {
+      db.exec(`
+        CREATE TABLE achievements_v2 (
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          achievement_id TEXT NOT NULL,
+          device_id TEXT NOT NULL DEFAULT '',
+          unlocked_at INTEGER NOT NULL,
+          PRIMARY KEY (user_id, achievement_id, device_id)
+        );
+        INSERT INTO achievements_v2 (user_id, achievement_id, device_id, unlocked_at)
+          SELECT user_id, achievement_id, '', unlocked_at FROM achievements;
+        DROP TABLE achievements;
+        ALTER TABLE achievements_v2 RENAME TO achievements;
+        CREATE INDEX IF NOT EXISTS idx_ach_user ON achievements(user_id);
+      `);
+    });
+    migrate();
+    console.log("[codequest] migrated achievements to device-scoped rows");
+  }
+}
 
 function emptyProgress() {
   return {
@@ -255,7 +288,7 @@ function getUserByToken(token) {
 function publicUser(u) {
   if (!u) return null;
   const achCount = db
-    .prepare(`SELECT COUNT(*) AS c FROM achievements WHERE user_id = ?`)
+    .prepare(`SELECT COUNT(DISTINCT achievement_id) AS c FROM achievements WHERE user_id = ?`)
     .get(u.id).c;
   return {
     id: u.id,
@@ -393,6 +426,35 @@ api.post("/auth/logout", authMiddleware, (req, res) => {
 
 api.get("/auth/me", authMiddleware, (req, res) => {
   res.json({ ok: true, user: publicUser(req.user) });
+});
+
+/** 当前账号在多少台设备上登录着（每台设备一条独立 token）。 */
+api.get("/auth/devices", authMiddleware, (req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT token, created_at AS createdAt, expires_at AS expiresAt
+       FROM sessions WHERE user_id = ? AND expires_at > ?
+       ORDER BY created_at DESC`
+    )
+    .all(req.user.id, Date.now());
+  res.json({
+    ok: true,
+    current: req.token ? `${req.token.slice(0, 6)}…` : null,
+    items: rows.map((row) => ({
+      id: `${row.token.slice(0, 6)}…`,
+      current: row.token === req.token,
+      createdAt: row.createdAt,
+      expiresAt: row.expiresAt,
+    })),
+  });
+});
+
+/** 退出其它设备（保留当前这台），token 泄露或换机时用。 */
+api.post("/auth/devices/revoke-others", authMiddleware, (req, res) => {
+  const info = db
+    .prepare(`DELETE FROM sessions WHERE user_id = ? AND token <> ?`)
+    .run(req.user.id, req.token || "");
+  res.json({ ok: true, revoked: info.changes });
 });
 
 /**
@@ -561,8 +623,10 @@ api.post("/auth/link-steam", authMiddleware, (req, res) => {
 
 /** 同步接口额外限流：每用户 10 次/分钟 */
 function syncRateLimit(req, res, next) {
-  const uid = req.user?.id || "anon";
-  if (!rateLimit({ key: `sync:${uid}`, limit: 10, windowMs: 60_000 })) {
+  // Keyed per session token, not per user: two devices on one account must not
+  // eat each other's budget.
+  const key = req.token ? `sync:tok:${req.token}` : `sync:uid:${req.user?.id || "anon"}`;
+  if (!rateLimit({ key, limit: 10, windowMs: 60_000 })) {
     return res.status(429).json({ ok: false, error: "rate_limited" });
   }
   next();
@@ -570,14 +634,19 @@ function syncRateLimit(req, res, next) {
 
 api.post("/sync/achievements", authMiddleware, syncRateLimit, (req, res) => {
   const items = Array.isArray(req.body?.achievements) ? req.body.achievements : [];
+  // Which install is talking. Sanitised because it lands in a primary key.
+  const deviceId = String(req.body?.deviceId || "")
+    .replace(/[^a-zA-Z0-9_-]/g, "")
+    .slice(0, 48);
   const upsert = db.prepare(
-    `INSERT INTO achievements (user_id, achievement_id, unlocked_at)
-     VALUES (?, ?, ?)
-     ON CONFLICT(user_id, achievement_id) DO UPDATE SET
+    `INSERT INTO achievements (user_id, achievement_id, device_id, unlocked_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(user_id, achievement_id, device_id) DO UPDATE SET
        unlocked_at = MIN(achievements.unlocked_at, excluded.unlocked_at)`
   );
   // A rebalanced catalog retires ids. `replace: true` lets a client declare
-  // "this list is my whole collection", so retired ids stop inflating the count.
+  // "this list is my whole collection" — but only for THIS device, so a second
+  // machine with a smaller collection cannot delete the first one's rows.
   const replace = req.body?.replace === true;
   const tx = db.transaction((rows) => {
     const keep = new Set();
@@ -586,22 +655,30 @@ api.post("/sync/achievements", authMiddleware, syncRateLimit, (req, res) => {
       const id = String(row?.id || row?.achievementId || "").trim();
       if (!id) continue;
       const at = Number(row?.unlockedAt) || Date.now();
-      upsert.run(req.user.id, id, at);
+      // Column order is (user_id, achievement_id, device_id, unlocked_at).
+      upsert.run(req.user.id, id, deviceId, at);
       keep.add(id);
       n += 1;
     }
     if (replace) {
-      const existing = db.prepare("SELECT achievement_id FROM achievements WHERE user_id = ?").all(req.user.id);
-      const drop = db.prepare("DELETE FROM achievements WHERE user_id = ? AND achievement_id = ?");
+      const existing = db
+        .prepare("SELECT achievement_id FROM achievements WHERE user_id = ? AND device_id = ?")
+        .all(req.user.id, deviceId);
+      const drop = db.prepare(
+        "DELETE FROM achievements WHERE user_id = ? AND device_id = ? AND achievement_id = ?"
+      );
       for (const row of existing) {
-        if (!keep.has(row.achievement_id)) drop.run(req.user.id, row.achievement_id);
+        if (!keep.has(row.achievement_id)) drop.run(req.user.id, deviceId, row.achievement_id);
       }
     }
     return n;
   });
   const synced = tx(items);
   bumpStat("achievement_sync_count", synced);
-  res.json({ ok: true, synced });
+  const total = db
+    .prepare("SELECT COUNT(DISTINCT achievement_id) AS c FROM achievements WHERE user_id = ?")
+    .get(req.user.id).c;
+  res.json({ ok: true, synced, deviceId, total });
 });
 
 api.post("/sync/scores", authMiddleware, syncRateLimit, (req, res) => {
@@ -649,8 +726,9 @@ api.post("/sync/scores", authMiddleware, syncRateLimit, (req, res) => {
 api.get("/sync/pull", authMiddleware, syncRateLimit, (req, res) => {
   const achievements = db
     .prepare(
-      `SELECT achievement_id AS id, unlocked_at AS unlockedAt
-       FROM achievements WHERE user_id = ? ORDER BY unlocked_at`
+      `SELECT achievement_id AS id, MIN(unlocked_at) AS unlockedAt
+       FROM achievements WHERE user_id = ?
+       GROUP BY achievement_id ORDER BY unlockedAt`
     )
     .all(req.user.id);
   const scores = db
@@ -729,7 +807,7 @@ api.get("/leaderboard/achievements", (req, res) => {
   const rows = db
     .prepare(
       `SELECT u.id AS userId, u.display_name AS displayName, u.avatar_url AS avatarUrl,
-              COUNT(a.achievement_id) AS achievementCount,
+              COUNT(DISTINCT a.achievement_id) AS achievementCount,
               MAX(a.unlocked_at) AS lastUnlockAt
        FROM users u
        JOIN achievements a ON a.user_id = u.id
@@ -777,7 +855,7 @@ api.get("/leaderboard", (req, res) => {
     rows = db
       .prepare(
         `SELECT u.id AS userId, u.display_name AS displayName, u.avatar_url AS avatarUrl,
-                COUNT(a.achievement_id) AS achievementCount,
+                COUNT(DISTINCT a.achievement_id) AS achievementCount,
                 MAX(a.unlocked_at) AS lastUnlockAt,
                 COALESCE(json_extract(u.progress_json, '$.level'), 1) AS level
          FROM users u
@@ -792,7 +870,7 @@ api.get("/leaderboard", (req, res) => {
     rows = db
       .prepare(
         `SELECT u.id AS userId, u.display_name AS displayName, u.avatar_url AS avatarUrl,
-                COUNT(a.achievement_id) AS achievementCount,
+                COUNT(DISTINCT a.achievement_id) AS achievementCount,
                 MAX(a.unlocked_at) AS lastUnlockAt,
                 COALESCE(json_extract(u.progress_json, '$.level'), 1) AS level
          FROM users u
@@ -810,7 +888,7 @@ api.get("/leaderboard", (req, res) => {
         `SELECT u.id AS userId, u.display_name AS displayName, u.avatar_url AS avatarUrl,
                 ${expr} AS value,
                 COALESCE(json_extract(u.progress_json, '$.level'), 1) AS level,
-                (SELECT COUNT(*) FROM achievements a WHERE a.user_id = u.id) AS achievementCount
+                (SELECT COUNT(DISTINCT a.achievement_id) FROM achievements a WHERE a.user_id = u.id) AS achievementCount
          FROM users u
          WHERE u.banned = 0
          ORDER BY value DESC, achievementCount DESC, u.last_login_at ASC
@@ -875,7 +953,9 @@ api.get("/leaderboard/minigames", (_req, res) => {
 
 api.get("/stats/public", (_req, res) => {
   const users = db.prepare(`SELECT COUNT(*) AS c FROM users WHERE banned = 0`).get().c;
-  const achievements = db.prepare(`SELECT COUNT(*) AS c FROM achievements`).get().c;
+  const achievements = db
+    .prepare(`SELECT COUNT(*) AS c FROM (SELECT DISTINCT user_id, achievement_id FROM achievements)`)
+    .get().c;
   const scores = db.prepare(`SELECT COUNT(*) AS c FROM minigame_scores`).get().c;
   res.json({ ok: true, users, achievements, scores });
 });
@@ -888,7 +968,7 @@ function adminUserRowSelect() {
                   stats_epoch_ms AS statsEpochMs,
                   progress_json AS progressJson,
                   progress_updated_at AS progressUpdatedAt,
-                  (SELECT COUNT(*) FROM achievements a WHERE a.user_id = users.id) AS achievementCount,
+                  (SELECT COUNT(DISTINCT a.achievement_id) FROM achievements a WHERE a.user_id = users.id) AS achievementCount,
                   (SELECT COUNT(*) FROM minigame_scores s WHERE s.user_id = users.id) AS scoreCount,
                   (SELECT COUNT(*) FROM sessions s WHERE s.user_id = users.id AND s.expires_at > ?) AS activeSessionCount
            FROM users`;
@@ -920,7 +1000,9 @@ api.get("/admin/overview", adminMiddleware, (_req, res) => {
     .prepare(`SELECT COUNT(*) AS c FROM users WHERE last_login_at > ?`)
     .get(Date.now() - 7 * 24 * 3600 * 1000).c;
   const banned = db.prepare(`SELECT COUNT(*) AS c FROM users WHERE banned = 1`).get().c;
-  const achievements = db.prepare(`SELECT COUNT(*) AS c FROM achievements`).get().c;
+  const achievements = db
+    .prepare(`SELECT COUNT(*) AS c FROM (SELECT DISTINCT user_id, achievement_id FROM achievements)`)
+    .get().c;
   const scores = db.prepare(`SELECT COUNT(*) AS c FROM minigame_scores`).get().c;
   const sessions = db
     .prepare(`SELECT COUNT(*) AS c FROM sessions WHERE expires_at > ?`)
@@ -1021,8 +1103,9 @@ api.get("/admin/users/:id", adminMiddleware, (req, res) => {
 
   const achievements = db
     .prepare(
-      `SELECT achievement_id AS id, unlocked_at AS unlockedAt
-       FROM achievements WHERE user_id = ? ORDER BY unlocked_at ASC`
+      `SELECT achievement_id AS id, MIN(unlocked_at) AS unlockedAt
+       FROM achievements WHERE user_id = ?
+       GROUP BY achievement_id ORDER BY unlockedAt ASC`
     )
     .all(req.params.id);
 
@@ -1122,8 +1205,9 @@ api.get("/admin/users/:id/export", adminMiddleware, (req, res) => {
   if (!raw) return res.status(404).json({ ok: false, error: "not_found" });
   const achievements = db
     .prepare(
-      `SELECT achievement_id AS id, unlocked_at AS unlockedAt
-       FROM achievements WHERE user_id = ? ORDER BY unlocked_at ASC`
+      `SELECT achievement_id AS id, MIN(unlocked_at) AS unlockedAt
+       FROM achievements WHERE user_id = ?
+       GROUP BY achievement_id ORDER BY unlockedAt ASC`
     )
     .all(req.params.id);
   const scores = db
@@ -1272,7 +1356,7 @@ api.get("/admin/leaderboard/achievements", adminMiddleware, (req, res) => {
   const rows = db
     .prepare(
       `SELECT u.id AS userId, u.display_name AS displayName, u.email,
-              COUNT(a.achievement_id) AS achievementCount
+              COUNT(DISTINCT a.achievement_id) AS achievementCount
        FROM users u JOIN achievements a ON a.user_id = u.id
        GROUP BY u.id ORDER BY achievementCount DESC LIMIT ?`
     )

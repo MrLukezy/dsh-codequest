@@ -145,6 +145,22 @@ a('my_achievement', '名字', '风味文案', '达成条件说明', '🎯', 'rar
 
 排行榜支持 **11 个榜**，界面上用 chip 切换：成就数、积分、等级、累计 Token、会话数、连续天数、活跃天数、工具调用、代码块、今日 Token、赛季成就。所有数值在服务端按字段取 MAX 合并，客户端重传一个更小的数不会把名次冲掉。
 
+### 多端登录（同一账号多台机器）
+
+同一个账号可以在任意多台机器上同时登录，每台机器一条独立 token：
+
+| 行为 | 结果 |
+| --- | --- |
+| 在 B 机登录 | 不影响 A 机，A 机的 token 仍然有效 |
+| 在 A 机退出 | 只删 A 机的 token，B 机继续在线 |
+| 成就同步 | **按设备分行存储**，用户的收藏 = 各设备并集；B 机成就少也不会删掉 A 机的记录 |
+| 进度 / Token | 按字段取 MAX 合并；同一天两台机器的 `todayTokens` 取较大值而不是相加 |
+| 限流 | 按 token 计数，两台设备各有自己的每分钟额度 |
+| 设备管理 | 「账号」页显示当前登录设备数，可一键「退出其它设备」（`GET /auth/devices`、`POST /auth/devices/revoke-others`） |
+| token 过期 | 30 天；插件收到 401 会清掉本地 token 并回到未登录状态，提示重新登录 |
+
+因为 DSH 的会话日志是本地的，两台机器的成就天然不同（B 机没跑过 A 机的项目），所以服务端把「同一 achievement_id 在不同设备上解锁」视为同一枚成就，按 `COUNT(DISTINCT achievement_id)` 计数。
+
 ### 自己部署
 
 ```bash
@@ -172,10 +188,12 @@ DSH_SHARED_SECRET="$(openssl rand -hex 24)" JWT_SECRET="$(openssl rand -hex 32)"
 | --- | --- |
 | `POST /auth/dsh` | DeepSeek 账号免密登录：`{accountKey, contact, name, avatarUrl, signature}`，首次自动建号，之后按 `dsh_account_id` 命中同一账号 |
 | `POST /auth/register`、`POST /auth/login` | 邮箱密码注册 / 登录（备用） |
-| `POST /sync/achievements` | 上传解锁记录 `{id, unlockedAt}` |
+| `POST /sync/achievements` | 上传解锁记录 `{id, unlockedAt, deviceId}`；`replace:true` 只清理**本设备**的旧记录，不碰其它设备 |
 | `POST /sync/season` | 建立/读取赛季起点 |
 | `POST /sync/progress` | 上传 `{totalTokens, totalSessions, sentiment, sources}`（服务端按字段取 MAX） |
 | `GET /leaderboard?kind=<board>&limit=50` | 多榜排行：achievements / season / points / level / tokens / sessions / streak / days / tools / code / today |
+| `GET /auth/devices` | 当前账号登录着的设备列表（`current` 标记当前这台） |
+| `POST /auth/devices/revoke-others` | 退出除当前设备外的所有设备 |
 
 免密登录的身份来自 Host 的 `ctx.deepseekAccount`（`getState()` + `getProfile()`），取 `profile.id` 作为稳定账号键、`profile.name` 作为昵称、`profile.avatarUrl` 作为头像；`contact` 若是脱敏手机号则不会写成邮箱。Host 用共享密钥对 `accountKey|contact` 做 HMAC-SHA256，服务端用 `crypto.timingSafeEqual` 校验，因此伪造的身份会被拒绝（401 `bad_signature`）。
 
@@ -197,6 +215,8 @@ DSH_SHARED_SECRET="$(openssl rand -hex 24)" JWT_SECRET="$(openssl rand -hex 32)"
 | POST | `/dsh-codequest/config` | 修改 `{cloudBase, sharedSecret}` |
 | POST | `/dsh-codequest/cloud/login` / `register` / `logout` | 账号操作 |
 | POST | `/dsh-codequest/cloud/sync` | 推送成就与进度 |
+| GET | `/dsh-codequest/cloud/devices` | 当前账号的登录设备列表 |
+| POST | `/dsh-codequest/cloud/devices/revoke` | 退出其它设备 |
 | POST | `/dsh-codequest/cloud/leaderboard?kind=<board>` | 拉取指定榜单 |
 | GET | `/dsh-codequest/icon/<name>.webp` | 成就徽章静态图（prefix 路由，7 天 immutable 缓存） |
 | GET | `/dsh-codequest/level/level_<n>.webp` | 等级段位头像（prefix 路由，同上缓存） |

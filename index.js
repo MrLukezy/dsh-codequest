@@ -178,6 +178,13 @@ export function apply(ctx) {
     saveTimer: null,
   };
 
+  // A stable per-install id: two machines sharing one account must not
+  // overwrite each other's collection when they sync to the leaderboard.
+  if (!state.deviceId) {
+    state.deviceId = crypto.randomBytes(8).toString('hex');
+    save();
+  }
+
   const cloud = new CloudClient(state.cloud.base || DEFAULT_CLOUD_BASE);
   cloud.setToken(state.cloud.token);
 
@@ -391,7 +398,7 @@ export function apply(ctx) {
     const metrics = metricsNow();
     const evaluation = evaluationNow();
     const achievements = Object.entries(state.unlocked).map(([id, unlockedAt]) => ({ id, unlockedAt }));
-    if (achievements.length > 0) await cloud.syncAchievements(achievements, true);
+    if (achievements.length > 0) await cloud.syncAchievements(achievements, true, state.deviceId);
     const season = await cloud.startSeason(state.cloud.statsEpochMs || Date.now());
     if (season && season.statsEpochMs) {
       state.cloud.statsEpochMs = season.statsEpochMs;
@@ -702,8 +709,42 @@ export function apply(ctx) {
             return json(res, 200, { ok: true, ...result });
           } catch (error) {
             state.cloud.lastError = String((error && error.message) || error);
+            // A dead token (30-day expiry, revoked on another device) must not
+            // leave the UI looking logged in forever.
+            if (error instanceof CloudError && error.status === 401) {
+              state.cloud.token = null;
+              state.cloud.user = null;
+              cloud.setToken(null);
+            }
             save();
             return json(res, 200, { ok: false, error: state.cloud.lastError });
+          }
+        },
+      },
+      {
+        /** 多端登录：列出当前登录的设备，并可一键踢掉其它设备。 */
+        path: `${PREFIX}/cloud/devices`,
+        handler: async (req, res) => {
+          if (req.method !== 'GET') return json(res, 405, { ok: false, error: 'method_not_allowed' });
+          if (!sameOrigin(req)) return json(res, 403, { ok: false, error: 'cross_origin' });
+          try {
+            const data = await cloud.devices();
+            return json(res, 200, { ok: true, ...data });
+          } catch (error) {
+            return json(res, 200, { ok: false, error: String((error && error.message) || error) });
+          }
+        },
+      },
+      {
+        path: `${PREFIX}/cloud/devices/revoke`,
+        handler: async (req, res) => {
+          if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'method_not_allowed' });
+          if (!sameOrigin(req)) return json(res, 403, { ok: false, error: 'cross_origin' });
+          try {
+            const data = await cloud.revokeOtherDevices();
+            return json(res, 200, { ok: true, revoked: data.revoked || 0 });
+          } catch (error) {
+            return json(res, 200, { ok: false, error: String((error && error.message) || error) });
           }
         },
       },

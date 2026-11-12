@@ -109,10 +109,10 @@ export class CloudClient {
   }
 
   /** @param {boolean} replace when true the list is the whole collection (retires ids) */
-  syncAchievements(achievements, replace = false) {
+  syncAchievements(achievements, replace = false, deviceId = '') {
     return this.request('/sync/achievements', {
       method: 'POST',
-      body: { achievements, replace },
+      body: { achievements, replace, deviceId },
     });
   }
 
@@ -135,6 +135,16 @@ export class CloudClient {
   leaderboard(limit = 50, kind = 'achievements') {
     const query = `limit=${encodeURIComponent(limit)}&kind=${encodeURIComponent(kind)}`;
     return this.request(`/leaderboard?${query}`, { auth: false });
+  }
+
+  /** Sessions (devices) currently signed in to this account. */
+  devices() {
+    return this.request('/auth/devices');
+  }
+
+  /** Sign out every other device, keeping this one. */
+  revokeOtherDevices() {
+    return this.request('/auth/devices/revoke-others', { method: 'POST' });
   }
 
   publicStats() {
