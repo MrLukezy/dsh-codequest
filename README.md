@@ -2,6 +2,8 @@
 
 把 DeepSeek Harness 真实的 **Token 流量 / 会话内容 / 工具调用** 变成一款成就游戏，并可连接自建服务器参与排行榜。
 
+📖 **图文教程**：[guide.lukezystudio.cn/dsh-codequest](https://guide.lukezystudio.cn/dsh-codequest/) —— 含成就墙、悬浮卡、数据页与排行榜的实拍截图。
+
 灵感与成就文案来自 [`MrLukezy/ai-using-achievement`](https://github.com/MrLukezy/ai-using-achievement)（TokenMonitor · CodeQuest），本插件是为 DSH 重新实现的数据层与界面，不是原项目的移植。
 
 ## 安装
