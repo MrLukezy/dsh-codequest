@@ -337,7 +337,7 @@ window.__ModuleLoader__.load({
     };
 
     const RARITY = {
-      common: { color: '#8b95a5', label: 'Common' },
+      common: { color: '#64748b', label: 'Common' },
       rare: { color: '#3b82f6', label: 'Rare' },
       epic: { color: '#a855f7', label: 'Epic' },
       legendary: { color: '#f59e0b', label: 'Legendary' },
@@ -471,14 +471,24 @@ function levelArtUrl(level) {
 .cq-prog{height:4px;border-radius:999px;background:color-mix(in srgb,var(--dsw-alias-label-secondary,#5b6472) 16%,transparent);margin-top:6px;overflow:hidden}
 .cq-prog i{display:block;height:100%;background:var(--cq-r)}
 .cq-meta{font-size:9.5px;color:var(--dsw-alias-label-secondary,#5b6472);margin-top:3px;font-variant-numeric:tabular-nums}
-.cq-card{cursor:pointer;transition:transform .12s ease,box-shadow .15s ease}
-.cq-card:hover{transform:translateY(-1px)}
+.cq-card{cursor:pointer;transition:transform .18s cubic-bezier(.2,.8,.3,1),box-shadow .22s ease,border-color .22s ease}
+.cq-card:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--cq-r) 70%,transparent);box-shadow:0 10px 26px color-mix(in srgb,var(--cq-r) 26%,transparent)}
+.cq-card::after{content:'';position:absolute;top:0;left:-45%;width:45%;height:100%;pointer-events:none;opacity:0;transform:skewX(-14deg);background:linear-gradient(105deg,transparent,rgba(255,255,255,.62),transparent)}
+.cq-card:hover::after{opacity:1;animation:cqShine .85s ease-out}
+@keyframes cqShine{from{left:-45%}to{left:115%}}
+.cq-card.on .cq-icon{box-shadow:0 0 0 2px color-mix(in srgb,var(--cq-r) 50%,transparent),0 5px 16px color-mix(in srgb,var(--cq-r) 28%,transparent)}
+.cq-card:hover .cq-icon{transform:scale(1.06)}
+.cq-icon{transition:transform .18s ease}
+.cq-card.on[data-r="legendary"]{animation:cqLegendary 3.4s ease-in-out infinite}
+@keyframes cqLegendary{0%,100%{box-shadow:0 0 0 1px color-mix(in srgb,#f59e0b 42%,transparent),0 6px 22px color-mix(in srgb,#f59e0b 26%,transparent)}50%{box-shadow:0 0 0 1px color-mix(in srgb,#f59e0b 72%,transparent),0 9px 30px color-mix(in srgb,#f59e0b 44%,transparent)}}
+.cq-card.secret::after,.cq-secretcard::after{display:none}
 .cq-card:focus-visible{outline:2px solid color-mix(in srgb,var(--cq-r) 70%,transparent);outline-offset:2px}
 .cq-overlay{position:fixed;right:16px;bottom:92px;z-index:60;display:flex;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:none;max-width:min(320px,calc(100vw - 32px))}
 .cq-overlay>*{pointer-events:auto}
 .cq-hud{display:flex;flex-direction:column;align-items:flex-end}
 .cq-dash{display:flex;flex-direction:column;gap:12px}
-.cq-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px}
+.cq-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (min-width:880px){.cq-kpis{grid-template-columns:repeat(6,minmax(0,1fr))}}
 .cq-kpi{position:relative;overflow:hidden;border:1px solid var(--dsw-alias-border-l2,#e3e6eb);border-radius:14px;padding:11px 13px 10px;background:linear-gradient(150deg,color-mix(in srgb,var(--cq-k,#4d6bfe) 10%,var(--dsw-alias-bg-layer-1,#fff)),var(--dsw-alias-bg-layer-1,#fff) 62%)}
 .cq-kpi::after{content:'';position:absolute;right:-18px;top:-18px;width:52px;height:52px;border-radius:50%;background:color-mix(in srgb,var(--cq-k,#4d6bfe) 16%,transparent)}
 .cq-kpi-l{font-size:10.5px;font-weight:700;letter-spacing:.03em;color:var(--dsw-alias-label-secondary,#5b6472)}
@@ -1603,17 +1613,7 @@ function levelArtUrl(level) {
         h(
           'svg',
           { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none', className: 'cq-trendsvg' },
-          h(
-            'defs',
-            null,
-            h(
-              'linearGradient',
-              { id: 'cqTrendFill', x1: '0', y1: '0', x2: '0', y2: '1' },
-              h('stop', { offset: '0%', stopColor: '#4d6bfe', stopOpacity: '0.42' }),
-              h('stop', { offset: '100%', stopColor: '#4d6bfe', stopOpacity: '0.02' }),
-            ),
-          ),
-          h('polygon', { points: area, fill: 'url(#cqTrendFill)' }),
+          h('polygon', { points: area, fill: 'rgba(77,107,254,0.16)' }),
           h('polyline', {
             points: line,
             fill: 'none',
