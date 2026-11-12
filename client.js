@@ -27,10 +27,29 @@ window.__ModuleLoader__.load({
         achievements: '成就',
         dashboard: '数据',
         leaderboard: '排行榜',
+        noServer: '还没有配置排行榜服务器，在「账号 → 服务器地址」里填一个就能上榜',
+        board_achievements: '成就数',
+        board_points: '积分',
+        board_level: '等级',
+        board_tokens: 'Token',
+        board_sessions: '会话',
+        board_streak: '连续天数',
+        board_days: '活跃天数',
+        board_tools: '工具调用',
+        board_code: '代码块',
+        board_today: '今日 Token',
+        board_season: '赛季',
         account: '账号',
         unlocked: '已解锁',
         locked: '未解锁',
         all: '全部',
+        search: '搜索成就',
+        noMatch: '没有匹配的成就',
+        recentUnlocks: '最近解锁',
+        sort_default: '默认',
+        sort_closest: '接近达成',
+        sort_rare: '稀有度',
+        sort_recent: '最近解锁',
         token: 'Token 流量',
         interaction: '交互',
         time: '时间',
@@ -132,10 +151,29 @@ window.__ModuleLoader__.load({
         achievements: 'Achievements',
         dashboard: 'Stats',
         leaderboard: 'Leaderboard',
+        noServer: 'No leaderboard server configured yet — set one under Account → Server',
+        board_achievements: 'Achievements',
+        board_points: 'Points',
+        board_level: 'Level',
+        board_tokens: 'Tokens',
+        board_sessions: 'Sessions',
+        board_streak: 'Streak',
+        board_days: 'Active days',
+        board_tools: 'Tool calls',
+        board_code: 'Code blocks',
+        board_today: 'Today tokens',
+        board_season: 'Season',
         account: 'Account',
         unlocked: 'Unlocked',
         locked: 'Locked',
         all: 'All',
+        search: 'Search achievements',
+        noMatch: 'No matching achievements',
+        recentUnlocks: 'Recently unlocked',
+        sort_default: 'Default',
+        sort_closest: 'Closest',
+        sort_rare: 'Rarity',
+        sort_recent: 'Recent',
         token: 'Token',
         interaction: 'Interaction',
         time: 'Time',
@@ -360,7 +398,15 @@ function levelArtUrl(level) {
 .cq-stat{border:1px solid var(--dsw-alias-border-l2,#e3e6eb);background:var(--dsw-alias-bg-layer-1,#fff);border-radius:10px;padding:9px 11px}
 .cq-stat b{display:block;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.2px}
 .cq-stat span{color:var(--dsw-alias-label-secondary,#5b6472);font-size:10.5px}
+.cq-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.cq-search{flex:1;min-width:160px}
+.cq-recent{display:flex;align-items:center;gap:8px;overflow:hidden}
+.cq-recentlabel{flex:none;font-size:10.5px;font-weight:700;color:var(--dsw-alias-label-secondary,#5b6472);letter-spacing:.02em}
+.cq-recentrow{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.cq-recentchip{display:flex;align-items:center;gap:5px;border:1px solid var(--dsw-alias-border-l2,#e3e6eb);background:none;border-radius:999px;padding:2px 9px 2px 6px;font:inherit;font-size:11px;color:var(--dsw-alias-label-primary,#1f2328);cursor:pointer;white-space:nowrap}
+.cq-recentchip:hover{background:color-mix(in srgb,#4d6bfe 10%,transparent)}
 .cq-filters{display:flex;gap:6px;flex-wrap:wrap}
+.cq-chips{display:flex;flex-wrap:wrap;gap:6px}
 .cq-fchip{border:1px solid var(--dsw-alias-border-l2,#e3e6eb);background:none;border-radius:999px;padding:2px 10px;font:inherit;font-size:11px;color:var(--dsw-alias-label-secondary,#5b6472);cursor:pointer}
 .cq-fchip.on{background:color-mix(in srgb,var(--dsw-alias-brand-primary,#4d6bfe) 12%,transparent);border-color:color-mix(in srgb,var(--dsw-alias-brand-primary,#4d6bfe) 45%,transparent);color:var(--dsw-alias-brand-primary,#4d6bfe)}
 .cq-group{display:flex;flex-direction:column;gap:8px}
@@ -464,6 +510,7 @@ function levelArtUrl(level) {
 .cq-pavatar.fallback{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#4d6bfe,#a855f7);color:#fff;font-size:10.5px;font-weight:800}
 .cq-brow:nth-child(odd){background:color-mix(in srgb,var(--dsw-alias-label-secondary,#5b6472) 5%,transparent)}
 .cq-brow.top{background:linear-gradient(90deg,color-mix(in srgb,#f59e0b 14%,transparent),transparent)}
+.cq-brow.me{background:color-mix(in srgb,#4d6bfe 10%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,#4d6bfe 30%,transparent)}
 .cq-rank{font-weight:800;color:var(--dsw-alias-label-secondary,#5b6472);font-variant-numeric:tabular-nums}
 .cq-empty{padding:22px;text-align:center;color:var(--dsw-alias-label-secondary,#5b6472);font-size:12px}
 `;
@@ -925,19 +972,42 @@ function levelArtUrl(level) {
       );
     }
 
+    /** Sort modes shared by the wall: default grouping, closest-to-unlock, recent. */
+    const SORT_MODES = ['default', 'closest', 'rare', 'recent'];
+
     function AchievementsTab({ data, t }) {
       const [category, setCategory] = useState('all');
       const [detail, setDetail] = useState(null);
+      const [query, setQuery] = useState('');
+      const [sort, setSort] = useState('default');
+
+      const needle = query.trim().toLowerCase();
 
       const groups = useMemo(() => {
         const buckets = new Map();
         for (const item of data.achievements || []) {
+          if (needle) {
+            const hay = `${item.name} ${item.desc} ${item.cond} ${item.id}`.toLowerCase();
+            if (!hay.includes(needle)) continue;
+          }
           if (!buckets.has(item.category)) buckets.set(item.category, []);
           buckets.get(item.category).push(item);
         }
         return CATEGORY_ORDER.filter((key) => buckets.has(key)).map((key) => {
           const items = buckets.get(key);
           const sorted = [...items].sort((a, b) => {
+            if (sort === 'closest') {
+              const left = a.unlockedAt ? 2 : a.ratio;
+              const right = b.unlockedAt ? 2 : b.ratio;
+              return right - left;
+            }
+            if (sort === 'rare') {
+              const order = { legendary: 0, epic: 1, rare: 2, common: 3 };
+              return (order[a.rarity] ?? 9) - (order[b.rarity] ?? 9) || b.ratio - a.ratio;
+            }
+            if (sort === 'recent') {
+              return (b.unlockedAt || 0) - (a.unlockedAt || 0);
+            }
             if (Boolean(a.unlockedAt) !== Boolean(b.unlockedAt)) return a.unlockedAt ? -1 : 1;
             return b.ratio - a.ratio;
           });
@@ -950,14 +1020,79 @@ function levelArtUrl(level) {
             maxPoints: items.reduce((sum, item) => sum + item.points, 0),
           };
         });
-      }, [data.achievements]);
+      }, [data.achievements, needle, sort]);
+
+      // "最近解锁" timeline: newest first, independent of the current filter.
+      const recent = useMemo(
+        () =>
+          (data.achievements || [])
+            .filter((item) => item.unlockedAt)
+            .sort((a, b) => b.unlockedAt - a.unlockedAt)
+            .slice(0, 6),
+        [data.achievements],
+      );
 
       const visible = category === 'all' ? groups : groups.filter((group) => group.key === category);
       const chips = [['all', t('all')], ...groups.map((group) => [group.key, t(group.key)])];
+      const shown = groups.reduce((sum, group) => sum + group.total, 0);
 
       return h(
         'div',
         { style: { display: 'flex', flexDirection: 'column', gap: '14px' } },
+        h(
+          'div',
+          { className: 'cq-toolbar' },
+          h('input', {
+            className: 'cq-input cq-search',
+            placeholder: t('search'),
+            value: query,
+            onChange: (event) => setQuery(event.target.value),
+          }),
+          h(
+            'div',
+            { className: 'cq-chips' },
+            SORT_MODES.map((mode) =>
+              h(
+                'button',
+                {
+                  key: mode,
+                  type: 'button',
+                  className: `cq-fchip${sort === mode ? ' on' : ''}`,
+                  onClick: () => setSort(mode),
+                },
+                t(`sort_${mode}`),
+              ),
+            ),
+          ),
+          needle
+            ? h('span', { className: 'cq-note' }, `${shown} / ${(data.achievements || []).length}`)
+            : null,
+        ),
+        recent.length > 0
+          ? h(
+              'div',
+              { className: 'cq-recent' },
+              h('span', { className: 'cq-recentlabel' }, t('recentUnlocks')),
+              h(
+                'div',
+                { className: 'cq-recentrow' },
+                recent.map((item) =>
+                  h(
+                    'button',
+                    {
+                      type: 'button',
+                      key: item.id,
+                      className: 'cq-recentchip',
+                      title: `${item.name} · ${new Date(item.unlockedAt).toLocaleDateString()}`,
+                      onClick: () => setDetail(item),
+                    },
+                    h('span', null, item.icon),
+                    h('span', null, item.name),
+                  ),
+                ),
+              ),
+            )
+          : null,
         h(
           'div',
           { className: 'cq-filters' },
@@ -974,6 +1109,9 @@ function levelArtUrl(level) {
             ),
           ),
         ),
+        visible.length === 0
+          ? h('div', { className: 'cq-empty' }, t('noMatch'))
+          : null,
         visible.map((group) =>
           h(
             'section',
@@ -1249,41 +1387,85 @@ function levelArtUrl(level) {
       );
     }
 
-    function LeaderboardTab({ t }) {
+    /** Boards the server can rank. Labels come from the client dictionary. */
+    const BOARDS = [
+      { key: 'achievements', field: 'achievementCount' },
+      { key: 'points', field: 'value' },
+      { key: 'level', field: 'value' },
+      { key: 'tokens', field: 'value' },
+      { key: 'sessions', field: 'value' },
+      { key: 'streak', field: 'value' },
+      { key: 'days', field: 'value' },
+      { key: 'tools', field: 'value' },
+      { key: 'code', field: 'value' },
+      { key: 'today', field: 'value' },
+      { key: 'season', field: 'value' },
+    ];
+
+    function LeaderboardTab({ t, data }) {
+      const [board, setBoard] = useState('achievements');
       const [items, setItems] = useState(null);
       const [error, setError] = useState(null);
+      const configured = Boolean(data && data.cloud && data.cloud.base);
+
       const load = useCallback(async () => {
-        const result = await api('/cloud/leaderboard', {});
+        if (!configured) return;
+        setItems(null);
+        const result = await api(`/cloud/leaderboard?kind=${encodeURIComponent(board)}`, {});
         if (result && result.ok) {
           setItems(result.items || []);
           setError(null);
         } else {
           setError((result && result.error) || 'leaderboard_failed');
         }
-      }, []);
+      }, [board, configured]);
 
       useEffect(() => {
         void load();
       }, [load]);
 
-      if (error) return h('div', { className: 'cq-empty' }, `${t('error')}: ${error}`);
-      if (!items) return h('div', { className: 'cq-empty' }, t('loading'));
-      if (items.length === 0) return h('div', { className: 'cq-empty' }, t('emptyBoard'));
+      const field = (BOARDS.find((entry) => entry.key === board) || BOARDS[0]).field;
+      const myId = data && data.cloud && data.cloud.user ? data.cloud.user.id : null;
+
+      const chips = h(
+        'div',
+        { className: 'cq-chips', style: { marginBottom: '10px' } },
+        BOARDS.map((entry) =>
+          h(
+            'button',
+            {
+              type: 'button',
+              key: entry.key,
+              className: `cq-fchip${board === entry.key ? ' on' : ''}`,
+              onClick: () => setBoard(entry.key),
+            },
+            t(`board_${entry.key}`),
+          ),
+        ),
+      );
+
+      if (!configured) {
+        return h('div', null, chips, h('div', { className: 'cq-empty' }, t('noServer')));
+      }
+      if (error) return h('div', null, chips, h('div', { className: 'cq-empty' }, `${t('error')}: ${error}`));
+      if (!items) return h('div', null, chips, h('div', { className: 'cq-empty' }, t('loading')));
+      if (items.length === 0) return h('div', null, chips, h('div', { className: 'cq-empty' }, t('emptyBoard')));
 
       return h(
         'div',
         { className: 'cq-board' },
+        chips,
         h(
           'div',
           { className: 'cq-brow', style: { color: 'var(--dsw-alias-label-secondary)', fontSize: '10.5px' } },
           h('span', null, t('rank')),
           h('span', null, t('player')),
-          h('span', { style: { textAlign: 'right' } }, t('achCount')),
+          h('span', { style: { textAlign: 'right' } }, t(`board_${board}`)),
         ),
         items.map((row) =>
           h(
             'div',
-            { className: `cq-brow${row.rank <= 3 ? ' top' : ''}`, key: row.userId },
+            { className: `cq-brow${row.rank <= 3 ? ' top' : ''}${row.userId === myId ? ' me' : ''}`, key: row.userId },
             h('span', { className: 'cq-rank' }, `#${row.rank}`),
             h(
               'span',
@@ -1293,7 +1475,7 @@ function levelArtUrl(level) {
                 : h('span', { className: 'cq-pavatar fallback' }, String(row.displayName || '?').slice(0, 1).toUpperCase()),
               h('span', { style: { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, row.displayName),
             ),
-            h('span', { style: { textAlign: 'right', fontVariantNumeric: 'tabular-nums' } }, fmtInt(row.achievementCount)),
+            h('span', { style: { textAlign: 'right', fontVariantNumeric: 'tabular-nums' } }, fmtInt(row[field])),
           ),
         ),
       );
@@ -1571,7 +1753,7 @@ function levelArtUrl(level) {
         ),
         tab === 'achievements' ? h(AchievementsTab, { data, t }) : null,
         tab === 'dashboard' ? h(DashboardTab, { data, t }) : null,
-        tab === 'leaderboard' ? h(LeaderboardTab, { t }) : null,
+        tab === 'leaderboard' ? h(LeaderboardTab, { t, data }) : null,
         tab === 'account' ? h(AccountTab, { data, t, reload }) : null,
       );
     }
@@ -1640,6 +1822,10 @@ function levelArtUrl(level) {
     };
   },
 });
+
+
+
+
 
 
 

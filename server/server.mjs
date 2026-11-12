@@ -23,10 +23,10 @@ const ADMIN_USER = process.env.ADMIN_USER || "admin";
 const ADMIN_PASS = process.env.ADMIN_PASS || "codequest-admin-2026";
 const STEAM_API_KEY = process.env.STEAM_API_KEY || "";
 const STEAM_REALM =
-  process.env.STEAM_REALM || "http://your-host.example";
+  process.env.STEAM_REALM || "http://localhost:3010";
 const STEAM_RETURN =
   process.env.STEAM_RETURN ||
-  "http://your-host.example/codequest/api/auth/steam/callback";
+  `${process.env.STEAM_REALM || "http://localhost:3010"}${process.env.BASE_PATH || "/codequest"}/api/auth/steam/callback`;
 /**
  * 与 dsh-codequest 插件共享的签名密钥：插件用它在本地证明「这条身份来自本机
  * 已登录的 DeepSeek 账号」，服务端据此免密建号。留空则该登录方式关闭。
@@ -109,6 +109,17 @@ function emptyProgress() {
   return {
     totalTokens: 0,
     totalSessions: 0,
+    // Board-facing scalars. All monotonic: a leaderboard must never go down
+    // because a client re-synced with a smaller number.
+    points: 0,
+    level: 1,
+    maxStreak: 0,
+    activeDays: 0,
+    todayTokens: 0,
+    toolCalls: 0,
+    codeBlocks: 0,
+    promptChars: 0,
+    updatedAt: 0,
     sentiment: { praise: 0, insult: 0, pua: 0, beg: 0, blame: 0 },
     sources: {},
   };
@@ -122,6 +133,15 @@ function parseProgress(raw) {
     return {
       totalTokens: Math.max(0, Number(p?.totalTokens) || 0),
       totalSessions: Math.max(0, Number(p?.totalSessions) || 0),
+      points: Math.max(0, Number(p?.points) || 0),
+      level: Math.max(1, Number(p?.level) || 1),
+      maxStreak: Math.max(0, Number(p?.maxStreak) || 0),
+      activeDays: Math.max(0, Number(p?.activeDays) || 0),
+      todayTokens: Math.max(0, Number(p?.todayTokens) || 0),
+      toolCalls: Math.max(0, Number(p?.toolCalls) || 0),
+      codeBlocks: Math.max(0, Number(p?.codeBlocks) || 0),
+      promptChars: Math.max(0, Number(p?.promptChars) || 0),
+      updatedAt: Math.max(0, Number(p?.updatedAt) || 0),
       sentiment: {
         praise: Math.max(0, Number(p?.sentiment?.praise) || 0),
         insult: Math.max(0, Number(p?.sentiment?.insult) || 0),
@@ -155,6 +175,15 @@ function mergeProgress(cloud, local) {
   return {
     totalTokens: Math.max(a.totalTokens, b.totalTokens),
     totalSessions: Math.max(a.totalSessions, b.totalSessions),
+    points: Math.max(a.points, b.points),
+    level: Math.max(a.level, b.level),
+    maxStreak: Math.max(a.maxStreak, b.maxStreak),
+    activeDays: Math.max(a.activeDays, b.activeDays),
+    todayTokens: Math.max(a.todayTokens, b.todayTokens),
+    toolCalls: Math.max(a.toolCalls, b.toolCalls),
+    codeBlocks: Math.max(a.codeBlocks, b.codeBlocks),
+    promptChars: Math.max(a.promptChars, b.promptChars),
+    updatedAt: Math.max(a.updatedAt, b.updatedAt) || Date.now(),
     sentiment: {
       praise: Math.max(a.sentiment.praise, b.sentiment.praise),
       insult: Math.max(a.sentiment.insult, b.sentiment.insult),
@@ -716,6 +745,93 @@ api.get("/leaderboard/achievements", (req, res) => {
   });
 });
 
+/**
+ * Every board reads one monotonic scalar. `achievements` and `season` are
+ * counted from the achievements table, the rest from the synced progress blob.
+ */
+const BOARDS = {
+  achievements: { field: "achievementCount", label: "成就数", unit: "枚" },
+  season: { field: "achievementCount", label: "赛季成就", unit: "枚", season: true },
+  points: { field: "points", label: "积分", unit: "分", json: "$.points" },
+  level: { field: "level", label: "等级", unit: "级", json: "$.level" },
+  tokens: { field: "totalTokens", label: "累计 Token", unit: "", json: "$.totalTokens" },
+  sessions: { field: "totalSessions", label: "会话数", unit: "局", json: "$.totalSessions" },
+  streak: { field: "maxStreak", label: "连续天数", unit: "天", json: "$.maxStreak" },
+  days: { field: "activeDays", label: "活跃天数", unit: "天", json: "$.activeDays" },
+  tools: { field: "toolCalls", label: "工具调用", unit: "次", json: "$.toolCalls" },
+  code: { field: "codeBlocks", label: "代码块", unit: "个", json: "$.codeBlocks" },
+  today: { field: "todayTokens", label: "今日 Token", unit: "", json: "$.todayTokens" },
+};
+
+api.get("/leaderboard", (req, res) => {
+  const ip = clientIp(req);
+  if (!rateLimit({ key: `lb:${ip}`, limit: 120, windowMs: 60_000 })) {
+    return res.status(429).json({ ok: false, error: "rate_limited" });
+  }
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+  const kind = String(req.query.kind || "achievements");
+  const board = BOARDS[kind] || BOARDS.achievements;
+
+  let rows;
+  if (board.season) {
+    rows = db
+      .prepare(
+        `SELECT u.id AS userId, u.display_name AS displayName, u.avatar_url AS avatarUrl,
+                COUNT(a.achievement_id) AS achievementCount,
+                MAX(a.unlocked_at) AS lastUnlockAt,
+                COALESCE(json_extract(u.progress_json, '$.level'), 1) AS level
+         FROM users u
+         JOIN achievements a ON a.user_id = u.id AND a.unlocked_at >= COALESCE(u.stats_epoch_ms, 0)
+         WHERE u.banned = 0
+         GROUP BY u.id
+         ORDER BY achievementCount DESC, lastUnlockAt ASC
+         LIMIT ?`
+      )
+      .all(limit);
+  } else if (kind === "achievements") {
+    rows = db
+      .prepare(
+        `SELECT u.id AS userId, u.display_name AS displayName, u.avatar_url AS avatarUrl,
+                COUNT(a.achievement_id) AS achievementCount,
+                MAX(a.unlocked_at) AS lastUnlockAt,
+                COALESCE(json_extract(u.progress_json, '$.level'), 1) AS level
+         FROM users u
+         JOIN achievements a ON a.user_id = u.id
+         WHERE u.banned = 0
+         GROUP BY u.id
+         ORDER BY achievementCount DESC, lastUnlockAt ASC
+         LIMIT ?`
+      )
+      .all(limit);
+  } else {
+    const expr = `COALESCE(json_extract(u.progress_json, '${board.json}'), 0)`;
+    rows = db
+      .prepare(
+        `SELECT u.id AS userId, u.display_name AS displayName, u.avatar_url AS avatarUrl,
+                ${expr} AS value,
+                COALESCE(json_extract(u.progress_json, '$.level'), 1) AS level,
+                (SELECT COUNT(*) FROM achievements a WHERE a.user_id = u.id) AS achievementCount
+         FROM users u
+         WHERE u.banned = 0
+         ORDER BY value DESC, achievementCount DESC, u.last_login_at ASC
+         LIMIT ?`
+      )
+      .all(limit);
+  }
+
+  res.json({
+    ok: true,
+    kind,
+    label: board.label,
+    unit: board.unit,
+    items: rows.map((r, i) => ({
+      rank: i + 1,
+      ...r,
+      value: board.season || kind === "achievements" ? r.achievementCount : Number(r.value) || 0,
+    })),
+  });
+});
+
 api.get("/leaderboard/minigame/:achievementId", (req, res) => {
   const achievementId = String(req.params.achievementId || "").trim();
   const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
@@ -1180,4 +1296,5 @@ app.listen(PORT, "127.0.0.1", () => {
   console.log(`[codequest] listening on http://127.0.0.1:${PORT}${BASE_PATH}`);
   console.log(`[codequest] admin: ${BASE_PATH}/admin/  user=${ADMIN_USER}`);
 });
+
 

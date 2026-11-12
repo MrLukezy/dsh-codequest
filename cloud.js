@@ -14,7 +14,7 @@ export class CloudError extends Error {
 }
 
 export class CloudClient {
-  /** @param {string} base e.g. http://your-host.example/codequest/api */
+  /** @param {string} base e.g. https://your-host.example/codequest/api */
   constructor(base) {
     this.base = String(base || '').replace(/\/+$/, '');
     this.token = null;
@@ -127,8 +127,14 @@ export class CloudClient {
     return this.request('/sync/pull');
   }
 
-  leaderboard(limit = 50) {
-    return this.request(`/leaderboard/achievements?limit=${encodeURIComponent(limit)}`, { auth: false });
+  /**
+   * @param {number} limit
+   * @param {string} kind achievements | season | points | level | tokens |
+   *   sessions | streak | days | tools | code | today
+   */
+  leaderboard(limit = 50, kind = 'achievements') {
+    const query = `limit=${encodeURIComponent(limit)}&kind=${encodeURIComponent(kind)}`;
+    return this.request(`/leaderboard?${query}`, { auth: false });
   }
 
   publicStats() {
@@ -140,10 +146,23 @@ export class CloudClient {
  * Build the season progress snapshot the server MAX-merges.
  * @param {object} metrics aggregate metrics from scan.js
  */
-export function progressFromMetrics(metrics) {
+export function progressFromMetrics(metrics, evaluation) {
+  const num = (value) => Math.max(0, Math.round(Number(value) || 0));
   return {
-    totalTokens: Math.max(0, Math.round(metrics.tokens || 0)),
-    totalSessions: Math.max(0, Math.round(metrics.sessions || 0)),
+    totalTokens: num(metrics.tokens),
+    totalSessions: num(metrics.sessions),
+    // Extra scalars so the server can rank more than one board. Every one is
+    // monotonic on the server side (MAX merge), so a stale client cannot
+    // push someone down a leaderboard.
+    points: num(evaluation && evaluation.points),
+    level: Math.max(1, num(evaluation && evaluation.level)),
+    maxStreak: num(metrics.maxStreak),
+    activeDays: num(metrics.activeDays),
+    todayTokens: num(metrics.tokensToday),
+    toolCalls: num(metrics.toolCalls),
+    codeBlocks: num(metrics.codeBlocks),
+    promptChars: num(metrics.promptChars),
+    updatedAt: Date.now(),
     sentiment: {
       praise: metrics.sentiment?.praise || 0,
       insult: metrics.sentiment?.insult || 0,
@@ -154,3 +173,5 @@ export function progressFromMetrics(metrics) {
     sources: { dsh: Math.max(0, Math.round(metrics.tokens || 0)) },
   };
 }
+
+

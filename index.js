@@ -24,7 +24,13 @@ export const name = 'dsh-codequest';
 const PREFIX = '/dsh-codequest';
 /** Bumped whenever the fold/metrics semantics change; surfaced for diagnostics. */
 const BUILD = '2026-11-13.1';
-const DEFAULT_CLOUD_BASE = 'http://your-host.example/codequest/api';
+
+/**
+ * No endpoint ships with the package: a public repo must not point at the
+ * author's own server. Set it per install through `POST /config {cloudBase}`
+ * (stored in `state.json`) or the `DSH_CODEQUEST_CLOUD` environment variable.
+ */
+const DEFAULT_CLOUD_BASE = process.env.DSH_CODEQUEST_CLOUD || '';
 const STATE_VERSION = 1;
 const LIVE_REFRESH_MS = 20_000;
 const AUTO_SCAN_MS = 10 * 60_000;
@@ -373,6 +379,7 @@ export function apply(ctx) {
         authMode: state.cloud.authMode || null,
         dsh: state.cloud.dsh || null,
         hasSecret: Boolean(state.cloud.sharedSecret),
+        boards: state.cloud.boards || {},
       },
     };
   }
@@ -388,7 +395,7 @@ export function apply(ctx) {
       state.cloud.statsEpochMs = season.statsEpochMs;
       if (!state.cloud.seasonStart) state.cloud.seasonStart = season.statsEpochMs;
     }
-    const progress = progressFromMetrics(metrics);
+    const progress = progressFromMetrics(metrics, evaluation);
     const pushed = await cloud.syncProgress(progress);
     state.cloud.lastSyncAt = Date.now();
     state.cloud.lastError = null;
@@ -503,6 +510,7 @@ export function apply(ctx) {
             ok: true,
             base: state.cloud.base,
             hasSecret: Boolean(state.cloud.sharedSecret),
+        boards: state.cloud.boards || {},
           });
         },
       },
@@ -669,8 +677,10 @@ export function apply(ctx) {
             return json(res, 405, { ok: false, error: 'method_not_allowed' });
           }
           if (!sameOrigin(req)) return json(res, 403, { ok: false, error: 'cross_origin' });
+          const url = new URL(req.url || '/', 'http://localhost');
+          const kind = String(url.searchParams.get('kind') || 'achievements').slice(0, 24);
           try {
-            const data = await cloud.leaderboard(50);
+            const data = await cloud.leaderboard(50, kind);
             const items = data.items || [];
             state.cloud.players = items.length;
             const me = state.cloud.user && items.find((row) => row.userId === state.cloud.user.id);
@@ -678,9 +688,17 @@ export function apply(ctx) {
               const best = Number(state.cloud.bestRank) || 0;
               if (!best || me.rank < best) state.cloud.bestRank = me.rank;
             }
+            state.cloud.boards = state.cloud.boards || {};
+            state.cloud.boards[kind] = {
+              label: data.label || kind,
+              unit: data.unit || '',
+              myRank: me ? me.rank : null,
+              myValue: me ? me.value : null,
+              at: Date.now(),
+            };
             save();
             recompute();
-            return json(res, 200, { ok: true, items });
+            return json(res, 200, { ok: true, kind, label: data.label || kind, unit: data.unit || '', items });
           } catch (error) {
             return json(res, 200, { ok: false, error: String((error && error.message) || error) });
           }
@@ -770,6 +788,10 @@ export function apply(ctx) {
   recompute();
   ctx.logger?.info?.(`dsh-codequest: ready (${Object.keys(state.sessions).length} cached session(s))`);
 }
+
+
+
+
 
 
 

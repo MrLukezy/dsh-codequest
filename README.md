@@ -25,7 +25,7 @@ dsh-codequest/            ← 插件包根目录（DSH 直接安装这一层）
 ├─ index.js               Host 半区：扫描会话、算成就、HTTP 路由、免密登录签名
 ├─ client.js              Client 半区：CodeQuest 页 + 浮层 HUD + 解锁提示
 ├─ scan.js / text.js      会话日志折叠与文本信号提取
-├─ achievements.js        301 枚成就定义与等级曲线
+├─ achievements.js        313 枚成就定义与等级曲线
 ├─ art.js                 成就 → 徽章图映射
 ├─ cloud.js               排行榜服务端客户端
 ├─ assets/icons/*.webp    84 张 chibi 徽章（192px）
@@ -41,9 +41,9 @@ dsh-codequest/            ← 插件包根目录（DSH 直接安装这一层）
 
 | 分区 | 内容 |
 | --- | --- |
-| 成就 | 301 枚成就，按 12 个分类**分组展示**（每组带 `已解锁/总数` 与积分进度条），每枚配 chibi 徽章图、稀有度描边与进度条；**点击卡片弹出详情**（达成条件、当前值/目标值、百分比、还差多少、解锁时间） |
+| 成就 | 313 枚成就，按 12 个分类**分组展示**（每组带 `已解锁/总数` 与积分进度条）；支持**搜索**、按「接近达成 / 稀有度 / 最近解锁」排序、**最近解锁时间线**；点击卡片弹出详情（达成条件、当前值/目标值、百分比、还差多少、解锁时间） |
 | 数据 | 最近 30 天流量柱图、常用工具排行、24 小时时段分布、**文本性格**、情绪关键词、常改文件类型、常用命令、模型分布 |
-| 排行榜 | 云端账号的成就数排行（前 50，带头像） |
+| 排行榜 | 11 个榜单可切换（成就 / 积分 / 等级 / Token / 会话 / 连续天数 / 活跃天数 / 工具调用 / 代码块 / 今日 Token / 赛季），前 50，带头像与自己那一行的高亮 |
 | 账号 | **DeepSeek 账号一键登录**、同步、退出、服务器地址配置（邮箱密码作为备用入口） |
 
 顶部是等级徽章、称号、积分与升级进度条。
@@ -94,11 +94,11 @@ $DSH_HOME/storages/dsh-codequest/state.json
 
 ## 成就与等级
 
-- **301 枚成就**，12 个分类，稀有度 `common / rare / epic / legendary`（59 / 111 / 96 / 35），分值 10 / 20 / 40 / 80。
+- **313 枚成就**，12 个分类，稀有度 `common / rare / epic / legendary`（59 / 111 / 96 / 35），分值 10 / 20 / 40 / 80。
 - 分类：Token 流量 26 · 交互 26 · 时间 22 · 文本性格 33 · 职场 26 · 代码与工具 35 · 精通 23 · 探索与收集 18 · 彩蛋 31 · 翻车现场 20 · 自我改造 28 · 社交与排行 13。
 - 阈值按本机真实数据标定：入门档是「再走几步就能拿到」，顶端档需要长期积累（例如 32B Token、2000 局会话、40 天连续活跃）。
 - 隐藏成就（如 `daily_1b`、`max_session_200m`、`late_night_40m`）未解锁前显示 `???`。
-- 等级公式：每级需要 `150 + 2×(等级-1)` 分，接近线性，所以等级大致等于完成度；全部 301 枚约 9.4k 分，最后一级「Token 之神」需要约 78% 的积分。
+- 等级公式：每级需要 `150 + 2×(等级-1)` 分，接近线性，所以等级大致等于完成度；全部 313 枚约 10k 分，最后一级「Token 之神」需要约 78% 的积分。
 - 判定是**单调**的：解锁时间一旦写入不会被撤销。
 
 「自我改造」「社交与排行」这两类读的是 DSH 自身的使用痕迹（用了哪些工具）和云端状态（同步次数、历史最高名次、排行榜玩家数），不是会话正文。
@@ -126,7 +126,7 @@ a('my_achievement', '名字', '风味文案', '达成条件说明', '🎯', 'rar
 ![等级头像](docs/levels.png)
 
 - 徽章来自 `MrLukezy/ai-using-achievement` 的 chibi 成就图（MIT），已裁掉透明边、居中方形化并缩到 192px WebP，共 84 张，合计约 1.5 MB。
-- 映射表在 `art.js`（301 条成就 → 84 张徽章，按 id 家族 + 分类就近分配，84 张全部用上）；重复使用的徽章只出现在语义相近的成就上。
+- 映射表在 `art.js`（313 条成就 → 84 张徽章，按 id 家族 + 分类就近分配，84 张全部用上）；重复使用的徽章只出现在语义相近的成就上。
 - 文件放在 `assets/icons/<name>.webp`，由 Host 的 prefix 路由 `GET /dsh-codequest/icon/<name>.webp` 以 `image/webp` + `immutable` 缓存下发；只接受 `[a-z0-9_]+\.webp`，路径穿越直接 404。
 - 插件图标 `icon.png` 由 `syn_ai_grandmaster` 徽章 + 品牌渐变合成。
 - 卡片按稀有度着色：`common` 灰蓝、`rare` 蓝、`epic` 紫、`legendary` 琥珀；解锁态有描边与光晕，未解锁只降透明度并加 🔒，不再整卡去色。
@@ -135,11 +135,11 @@ a('my_achievement', '名字', '风味文案', '达成条件说明', '🎯', 'rar
 
 ## 云端排行榜
 
-服务端在 `server/`，Express + better-sqlite3，单文件、无外部依赖服务。作者自用的实例部署在：
+服务端在 `server/`，Express + better-sqlite3，单文件、无外部依赖服务。
 
-- API：`http://your-host.example/codequest/api`
-- 管理后台：`http://your-host.example/codequest/admin/`
-- 进程：systemd `codequest`（`127.0.0.1:3010`），nginx 以 `/codequest/` 反代
+**插件不带任何默认服务器地址**：公开仓库里写死作者自己的服务器，等于把地址发给所有人。装好后在「账号 → 服务器地址」填你自己的，或设置 `DSH_CODEQUEST_CLOUD` 环境变量；两者都没有时排行榜整块显示「未配置」，不影响单机玩。
+
+排行榜支持 **11 个榜**，界面上用 chip 切换：成就数、积分、等级、累计 Token、会话数、连续天数、活跃天数、工具调用、代码块、今日 Token、赛季成就。所有数值在服务端按字段取 MAX 合并，客户端重传一个更小的数不会把名次冲掉。
 
 ### 自己部署
 
@@ -171,7 +171,7 @@ DSH_SHARED_SECRET="$(openssl rand -hex 24)" JWT_SECRET="$(openssl rand -hex 32)"
 | `POST /sync/achievements` | 上传解锁记录 `{id, unlockedAt}` |
 | `POST /sync/season` | 建立/读取赛季起点 |
 | `POST /sync/progress` | 上传 `{totalTokens, totalSessions, sentiment, sources}`（服务端按字段取 MAX） |
-| `GET /leaderboard/achievements?limit=50` | 成就数排行榜 |
+| `GET /leaderboard?kind=<board>&limit=50` | 多榜排行：achievements / season / points / level / tokens / sessions / streak / days / tools / code / today |
 
 免密登录的身份来自 Host 的 `ctx.deepseekAccount`（`getState()` + `getProfile()`），取 `profile.id` 作为稳定账号键、`profile.name` 作为昵称、`profile.avatarUrl` 作为头像；`contact` 若是脱敏手机号则不会写成邮箱。Host 用共享密钥对 `accountKey|contact` 做 HMAC-SHA256，服务端用 `crypto.timingSafeEqual` 校验，因此伪造的身份会被拒绝（401 `bad_signature`）。
 
@@ -192,7 +192,7 @@ DSH_SHARED_SECRET="$(openssl rand -hex 24)" JWT_SECRET="$(openssl rand -hex 32)"
 | POST | `/dsh-codequest/config` | 修改 `{cloudBase, sharedSecret}` |
 | POST | `/dsh-codequest/cloud/login` / `register` / `logout` | 账号操作 |
 | POST | `/dsh-codequest/cloud/sync` | 推送成就与进度 |
-| POST | `/dsh-codequest/cloud/leaderboard` | 拉取排行榜 |
+| POST | `/dsh-codequest/cloud/leaderboard?kind=<board>` | 拉取指定榜单 |
 | GET | `/dsh-codequest/icon/<name>.webp` | 成就徽章静态图（prefix 路由，7 天 immutable 缓存） |
 | GET | `/dsh-codequest/level/level_<n>.webp` | 等级段位头像（prefix 路由，同上缓存） |
 
@@ -225,6 +225,8 @@ node test/render.test.mjs
 - 每类信号每个 prompt 只计一次，且只看会话前 12 条 prompt 的前 600 字符。
 - 「夜间」定义为 20:00 之后开始；「周末」类成就已移除（对工作日作息不可达成）。
 - 礼貌 / emoji / 咖啡这类信号取决于你的表达习惯，可能长期为 0——它们是彩蛋，不是必拿项。
-- 排行榜只统计成就数，不区分成就分值。
+- 排行榜的「今日 Token」由客户端上报，服务端只做 MAX 合并，不能跨天归零（本地跨天后会自然降为当天值）。
 - 界面文字目前中/英双语硬编码在 `client.js`，`locale/*.json` 只提供插件管理页的标题与描述。
+
+
 
