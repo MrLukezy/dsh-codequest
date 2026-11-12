@@ -623,6 +623,10 @@ function levelArtUrl(level) {
 .cq-modalvalue{font-size:12px;line-height:1.5}
 .cq-modalnote{margin-top:6px;font-size:10.5px;color:var(--dsw-alias-label-secondary,#5b6472)}
 .cq-prog.big{height:8px}
+/* 80%+ goals breathe a little, so the eye lands on what is about to pop. */
+.cq-card.near{box-shadow:0 0 0 1px color-mix(in srgb,var(--cq-r) 55%,transparent),0 6px 20px color-mix(in srgb,var(--cq-r) 22%,transparent)}
+.cq-card.near .cq-prog i{animation:cqNear 2.2s ease-in-out infinite}
+@keyframes cqNear{0%,100%{filter:brightness(1)}50%{filter:brightness(1.4)}}
 /* --- unlock panel: ring, hero glow, next-up chain, footprint --- */
 .cq-hero{position:relative;display:flex;gap:14px;align-items:center;padding:2px 0 10px}
 .cq-heroglow{position:absolute;left:-26px;top:-30px;width:180px;height:180px;border-radius:50%;pointer-events:none;
@@ -909,7 +913,7 @@ function levelArtUrl(level) {
       return h(
         'div',
         {
-          className: `cq-card${locked ? ' locked' : ' on'}${secret ? ' secret' : ''}`,
+          className: `cq-card${locked ? ' locked' : ' on'}${secret ? ' secret' : ''}${locked && !secret && item.ratio >= 0.8 ? ' near' : ''}`,
           style: { '--cq-r': secret ? '#8b93a3' : rarity.color },
           'data-r': secret ? 'secret' : item.rarity,
           role: 'button',
