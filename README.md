@@ -158,6 +158,8 @@ a('my_achievement', '名字', '风味文案', '达成条件说明', '🎯', 'rar
 
 **开箱即连**：插件内置项目自己的排行榜地址（`https://www.lukezystudio.cn/codequest/api`），装好、用 DeepSeek 账号登录就能上榜，不需要填任何地址。想换成自己的服务端，用「账号 → 服务器与密钥 → 改成我自己的服务器」，或设 `DSH_CODEQUEST_CLOUD` 环境变量，或 `POST /dsh-codequest/config {"cloudBase":"…"}`（传空字符串恢复默认）。界面里**不显示**当前地址。
 
+> 免密登录要和服务端的 `DSH_SHARED_SECRET` 一致，密钥不在仓库里：拿到别人的机器上用，地址是通的，但免密登录会返回 `bad_signature`。这种情况用「账号 → 改用邮箱 + 密码」注册/登录即可（服务端 `/auth/register`、`/auth/login`）。
+
 排行榜支持 **11 个榜**，界面上用 chip 切换：成就数、积分、等级、累计 Token、会话数、连续天数、活跃天数、工具调用、代码块、今日 Token、赛季成就。所有数值在服务端按字段取 MAX 合并，客户端重传一个更小的数不会把名次冲掉。
 
 ### 多端登录（同一账号多台机器）
