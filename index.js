@@ -807,6 +807,62 @@ export function apply(ctx) {
           }
         },
       },
+    {
+        path: `${PREFIX}/cloud/share`,
+        handler: async (req, res) => {
+          if (req.method !== 'POST') return json(res, 405, { ok: false, error: 'method_not_allowed' });
+          if (!sameOrigin(req)) return json(res, 403, { ok: false, error: 'cross_origin' });
+          const body = await readJsonBody(req);
+          if (!body || typeof body !== 'object') return json(res, 400, { ok: false, error: 'invalid_json' });
+          if (!state.cloud.token) return json(res, 200, { ok: false, error: 'not_logged_in' });
+
+          const items = (runtime.evaluation && runtime.evaluation.items) || [];
+          const item = items.find((entry) => entry.id === body.achievementId);
+          if (!item) return json(res, 200, { ok: false, error: 'unknown_achievement' });
+          // A sealed achievement must never leave the machine: sharing it would
+          // put its name and condition in a public URL.
+          if (!item.unlockedAt && (item.secret || item.hidden)) {
+            return json(res, 200, { ok: false, error: 'still_secret' });
+          }
+
+          let art = null;
+          if (item.art) {
+            try {
+              const bytes = await fs.promises.readFile(path.join(ICON_ROOT, `${item.art}.webp`));
+              art = `data:image/webp;base64,${bytes.toString('base64')}`;
+            } catch {
+              /* the card still works without art */
+            }
+          }
+
+          try {
+            const data = await cloud.share({
+              achievement: {
+                id: item.id,
+                name: item.name,
+                desc: item.desc,
+                cond: item.cond,
+                rarity: item.rarity,
+                category: item.category,
+                categoryLabel: (CATEGORY_LABELS && CATEGORY_LABELS[item.category]) || item.category,
+                points: item.points,
+                unlockedAt: item.unlockedAt || null,
+                ratio: item.ratio,
+                level: runtime.evaluation ? runtime.evaluation.level : 0,
+                unlockedCount: runtime.evaluation ? runtime.evaluation.unlocked : 0,
+                totalCount: runtime.evaluation ? runtime.evaluation.total : 0,
+              },
+              art,
+            });
+            if (!data || !data.ok) return json(res, 200, { ok: false, error: (data && data.error) || 'share_failed' });
+            state.cloud.lastShare = { id: data.id, url: data.url, at: Date.now() };
+            save();
+            return json(res, 200, { ok: true, id: data.id, url: data.url });
+          } catch (error) {
+            return json(res, 200, { ok: false, error: String((error && error.message) || error) });
+          }
+        },
+      },
     ];
   }
 

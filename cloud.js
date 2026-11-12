@@ -150,6 +150,14 @@ export class CloudClient {
   publicStats() {
     return this.request('/stats/public', { auth: false });
   }
+
+  /**
+   * Publish an achievement card and get back a link anyone can open.
+   * @param {object} payload `{ achievement, art }` — `art` is a data URL
+   */
+  share(payload) {
+    return this.request('/share', { method: 'POST', body: payload });
+  }
 }
 
 /**

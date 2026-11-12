@@ -211,6 +211,22 @@ DSH_SHARED_SECRET="$(openssl rand -hex 24)" JWT_SECRET="$(openssl rand -hex 32)"
 | `GET /leaderboard?kind=<board>&limit=50` | 多榜排行：achievements / season / points / level / tokens / sessions / streak / days / tools / code / today |
 | `GET /auth/devices` | 当前账号登录着的设备列表（`current` 标记当前这台） |
 | `POST /auth/devices/revoke-others` | 退出除当前设备外的所有设备 |
+| `POST /share` | 分享一枚成就：`{achievement, art}`，返回 `{id, url}` |
+| `GET /share/:id` | 分享内容的 JSON |
+| `GET /s/:id` | 分享页（HTML，带 `og:` 预览标签） |
+| `GET /s/:id/art` | 分享页用的徽章图（存在库里，不依赖插件本机） |
+
+### 分享
+
+成就详情弹窗底部有「分享这张卡片」：Host 把成就字段和徽章图（`assets/icons/*.webp`，约 20 KB）一起 POST 到 `/share`，服务端存进 SQLite 并返回一个短链，形如
+
+```
+https://www.lukezystudio.cn/codequest/s/4fdcbk7d
+```
+
+链接是公开的、不需要登录就能看，页面自带 `og:title` / `og:description` / `og:image`，贴到群里会有预览。**未揭晓的成就不能分享**（Host 直接拒绝，返回 `still_secret`），避免把隐藏成就的名字和条件泄露到公开链接里。
+
+分享页用的图存在服务端数据库里，不依赖分享者的机器在线；站点地址由环境变量 `PUBLIC_BASE` 决定（默认 `https://www.lukezystudio.cn`）。
 
 免密登录的身份来自 Host 的 `ctx.deepseekAccount`（`getState()` + `getProfile()`），取 `profile.id` 作为稳定账号键、`profile.name` 作为昵称、`profile.avatarUrl` 作为头像；`contact` 若是脱敏手机号则不会写成邮箱。Host 用共享密钥对 `accountKey|contact` 做 HMAC-SHA256，服务端用 `crypto.timingSafeEqual` 校验，因此伪造的身份会被拒绝（401 `bad_signature`）。
 
@@ -235,6 +251,7 @@ DSH_SHARED_SECRET="$(openssl rand -hex 24)" JWT_SECRET="$(openssl rand -hex 32)"
 | GET | `/dsh-codequest/cloud/devices` | 当前账号的登录设备列表 |
 | POST | `/dsh-codequest/cloud/devices/revoke` | 退出其它设备 |
 | POST | `/dsh-codequest/cloud/leaderboard?kind=<board>` | 拉取指定榜单 |
+| POST | `/dsh-codequest/cloud/share` | 分享一枚成就 `{achievementId}`，返回公开链接 |
 | GET | `/dsh-codequest/icon/<name>.webp` | 成就徽章静态图（prefix 路由，7 天 immutable 缓存） |
 | GET | `/dsh-codequest/level/level_<n>.webp` | 等级段位头像（prefix 路由，同上缓存） |
 

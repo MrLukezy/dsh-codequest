@@ -142,6 +142,15 @@ window.__ModuleLoader__.load({
         etaPrefix: '按你过去几个活跃日的平均速度，大约再',
         etaUnit: '天',
         nextUp: '同分类里最接近的几个',
+        shareCard: '分享这张卡片',
+        sharing: '生成链接…',
+        copy: '复制',
+        open: '打开',
+        shareCopied: '链接已复制，贴到群里就能看',
+        shareCopyHint: '手动复制上面的链接也可以',
+        shareNeedLogin: '先登录账号（账号页）才能生成分享链接',
+        shareSecretBlocked: '未揭晓的成就不能分享，会剧透',
+        shareFailed: '分享失败：',
         allAchievements: '全部成就',
         secretCount: '还有这么多没揭晓：',
         secretUnit: '枚未揭晓',
@@ -306,6 +315,16 @@ window.__ModuleLoader__.load({
         etaPrefix: 'At your average pace, about',
         etaUnit: 'more days',
         nextUp: 'Closest in this category',
+        shareCard: 'Share this card',
+        sharing: 'Creating link…',
+        copy: 'Copy',
+        open: 'Open',
+        shareCopied: 'Link copied — paste it anywhere',
+        shareCopyHint: 'Copy the link above by hand if needed',
+        shareNeedLogin: 'Sign in on the account tab first',
+        shareSecretBlocked: 'Sealed achievements cannot be shared',
+        shareFailed: 'Share failed: ',
+        shareShort: 'Share',
         allAchievements: 'All achievements',
         secretCount: 'Still hidden:',
         secretUnit: 'undiscovered',
@@ -658,6 +677,10 @@ function levelArtUrl(level) {
 .cq-footstat{font-size:10px;color:var(--dsw-alias-label-secondary,#5b6472);border:1px solid var(--dsw-alias-border-l2,#e3e6eb);
   border-radius:999px;padding:3px 8px;background:rgba(120,130,150,.06)}
 .cq-footstat b{color:var(--dsw-alias-label-primary,#1f2328)}
+.cq-share{margin-top:14px;display:flex;flex-direction:column;gap:0}
+.cq-sharebox{display:flex;gap:8px;align-items:center;width:100%}
+.cq-sharelink{font-size:11.5px;color:#4d6bfe;text-decoration:none;white-space:nowrap;padding:6px 2px}
+.cq-sharelink:hover{text-decoration:underline}
 @keyframes cqPop{0%{transform:scale(.86)}100%{transform:scale(1)}}
 .cq-dshrow{display:flex;align-items:center;gap:10px;margin-top:8px}
 .cq-dshavatar{width:38px;height:38px;border-radius:50%;object-fit:cover;flex:none;box-shadow:0 0 0 2px color-mix(in srgb,#4d6bfe 35%,transparent)}
@@ -1714,6 +1737,9 @@ function levelArtUrl(level) {
     }
 
     function AchievementDetail({ item, t, data, onPick, onClose }) {
+      const [share, setShare] = useState(null);
+      const [shareBusy, setShareBusy] = useState(false);
+
       useEffect(() => {
         const onKey = (event) => {
           if (event.key === 'Escape') onClose();
@@ -1721,6 +1747,49 @@ function levelArtUrl(level) {
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
       }, [onClose]);
+
+      /** Publish the card on the leaderboard server and hand back its link. */
+      async function doShare() {
+        setShareBusy(true);
+        setShare(null);
+        try {
+          const result = await api('/cloud/share', { achievementId: item.id });
+          if (result && result.ok && result.url) {
+            setShare({ url: result.url, note: null });
+            void copyShare(result.url, true);
+          } else {
+            const error = (result && result.error) || 'share_failed';
+            setShare({
+              note:
+                error === 'not_logged_in'
+                  ? t('shareNeedLogin')
+                  : error === 'still_secret'
+                    ? t('shareSecretBlocked')
+                    : `${t('shareFailed')} ${error}`,
+            });
+          }
+        } catch (error) {
+          setShare({ note: `${t('shareFailed')} ${String((error && error.message) || error)}` });
+        } finally {
+          setShareBusy(false);
+        }
+      }
+
+      async function copyShare(url, quiet) {
+        let copied = false;
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(url);
+            copied = true;
+          }
+        } catch {
+          copied = false;
+        }
+        setShare((current) => (current && current.url ? { ...current, note: copied ? t('shareCopied') : t('shareCopyHint') } : current));
+        if (!copied && !quiet) {
+          /* the field is selectable, so the hint above is enough */
+        }
+      }
 
       const rarity = RARITY[item.rarity] || RARITY.common;
       const secret = !item.unlockedAt && (item.secret || item.hidden);
@@ -1859,6 +1928,39 @@ function levelArtUrl(level) {
               h('b', null, `${data && data.progress ? data.progress.unlocked : 0}/${data && data.progress ? data.progress.total : all.length}`),
             ),
           ),
+
+          secret
+            ? null
+            : h(
+                'div',
+                { className: 'cq-share' },
+                share && share.url
+                  ? h(
+                      'div',
+                      { className: 'cq-sharebox' },
+                      h('input', {
+                        className: 'cq-input',
+                        readOnly: true,
+                        value: share.url,
+                        onFocus: (event) => event.currentTarget.select(),
+                        onClick: (event) => event.currentTarget.select(),
+                      }),
+                      h('button', { type: 'button', className: 'cq-btn', onClick: () => void copyShare(share.url) }, t('copy')),
+                      h(
+                        'a',
+                        { className: 'cq-sharelink', href: share.url, target: '_blank', rel: 'noreferrer' },
+                        t('open'),
+                      ),
+                    )
+                  : h(
+                      'button',
+                      { type: 'button', className: 'cq-btn', disabled: shareBusy, onClick: doShare },
+                      shareBusy ? t('sharing') : `🔗 ${t('shareCard')}`,
+                    ),
+                share && share.note
+                  ? h('div', { className: 'cq-modalnote', style: { marginTop: '8px' } }, share.note)
+                  : null,
+              ),
         ),
       );
     }

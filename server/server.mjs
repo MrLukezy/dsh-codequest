@@ -32,6 +32,11 @@ const STEAM_RETURN =
  * 已登录的 DeepSeek 账号」，服务端据此免密建号。留空则该登录方式关闭。
  */
 const DSH_SHARED_SECRET = process.env.DSH_SHARED_SECRET || "change-me-codequest-shared-secret";
+/**
+ * 分享页对外用的站点地址。反向代理后面 req.host 是内网地址，所以显式配置，
+ * 生成的分享链接形如 `${PUBLIC_BASE}${BASE_PATH}/s/<id>`。
+ */
+const PUBLIC_BASE = (process.env.PUBLIC_BASE || "https://www.lukezystudio.cn").replace(/\/$/, "");
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -85,6 +90,18 @@ CREATE TABLE IF NOT EXISTS minigame_scores (
 CREATE TABLE IF NOT EXISTS meta (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
+);
+
+-- 成就分享：一次点击生成一条，公开可看，带图。
+CREATE TABLE IF NOT EXISTS shares (
+  id TEXT PRIMARY KEY,
+  user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+  achievement_id TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  art BLOB,
+  art_type TEXT,
+  created_at INTEGER NOT NULL,
+  views INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_ach_user ON achievements(user_id);
@@ -958,6 +975,232 @@ api.get("/stats/public", (_req, res) => {
     .get().c;
   const scores = db.prepare(`SELECT COUNT(*) AS c FROM minigame_scores`).get().c;
   res.json({ ok: true, users, achievements, scores });
+});
+
+/* ------------------------------------------------------------------ *
+ * 成就分享：插件点「分享」→ 这里存一条 → 返回一个可以到处贴的链接
+ * ------------------------------------------------------------------ */
+
+const SHARE_ID_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz";
+
+function newShareId() {
+  const bytes = crypto.randomBytes(8);
+  let out = "";
+  for (const byte of bytes) out += SHARE_ID_ALPHABET[byte % SHARE_ID_ALPHABET.length];
+  return out;
+}
+
+function escapeHtml(value) {
+  return String(value == null ? "" : value).replace(
+    /[&<>"']/g,
+    (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]
+  );
+}
+
+function shareUrl(id) {
+  return `${PUBLIC_BASE}${BASE_PATH}/s/${id}`;
+}
+
+api.post("/share", authMiddleware, (req, res) => {
+  const body = req.body || {};
+  const achievement = body.achievement;
+  if (!achievement || typeof achievement !== "object" || !achievement.name) {
+    return res.status(400).json({ ok: false, error: "invalid_achievement" });
+  }
+  const id = newShareId();
+  const payload = {
+    name: String(achievement.name).slice(0, 80),
+    desc: String(achievement.desc || "").slice(0, 300),
+    cond: String(achievement.cond || "").slice(0, 300),
+    rarity: ["common", "rare", "epic", "legendary"].includes(achievement.rarity)
+      ? achievement.rarity
+      : "common",
+    category: String(achievement.category || "").slice(0, 40),
+    categoryLabel: String(achievement.categoryLabel || "").slice(0, 40),
+    points: Math.max(0, Math.min(9999, Number(achievement.points) || 0)),
+    unlockedAt: Number(achievement.unlockedAt) || null,
+    ratio: Math.max(0, Math.min(1, Number(achievement.ratio) || 0)),
+    displayName: String(req.user.display_name || "").slice(0, 40),
+    avatarUrl: String(req.user.avatar_url || "").slice(0, 400),
+    level: Math.max(0, Math.min(999, Number(achievement.level) || 0)),
+    progress: {
+      unlocked: Math.max(0, Number(achievement.unlockedCount) || 0),
+      total: Math.max(0, Number(achievement.totalCount) || 0),
+    },
+  };
+
+  let art = null;
+  let artType = null;
+  const raw = typeof body.art === "string" ? body.art : "";
+  const match = /^data:(image\/(?:webp|png|jpeg));base64,([A-Za-z0-9+/=]+)$/.exec(raw);
+  if (match) {
+    const buf = Buffer.from(match[2], "base64");
+    if (buf.length > 0 && buf.length <= 400 * 1024) {
+      art = buf;
+      artType = match[1];
+    }
+  }
+
+  db.prepare(
+    `INSERT INTO shares (id, user_id, achievement_id, payload_json, art, art_type, created_at, views)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0)`
+  ).run(
+    id,
+    req.user.id,
+    String(achievement.id || achievement.name).slice(0, 80),
+    JSON.stringify(payload),
+    art,
+    artType,
+    Date.now()
+  );
+
+  res.json({ ok: true, id, url: shareUrl(id) });
+});
+
+api.get("/share/:id", (req, res) => {
+  const row = db.prepare(`SELECT id, payload_json, created_at, views FROM shares WHERE id = ?`).get(req.params.id);
+  if (!row) return res.status(404).json({ ok: false, error: "not_found" });
+  res.json({ ok: true, id: row.id, createdAt: row.created_at, views: row.views, ...JSON.parse(row.payload_json) });
+});
+
+const RARITY_COLORS = {
+  common: "#64748b",
+  rare: "#3b82f6",
+  epic: "#a855f7",
+  legendary: "#f59e0b",
+};
+const RARITY_LABELS = {
+  common: "普通",
+  rare: "稀有",
+  epic: "史诗",
+  legendary: "传说",
+};
+
+function renderSharePage(row) {
+  const data = JSON.parse(row.payload_json);
+  const color = RARITY_COLORS[data.rarity] || RARITY_COLORS.common;
+  const rarityLabel = RARITY_LABELS[data.rarity] || RARITY_LABELS.common;
+  const artUrl = `${PUBLIC_BASE}${BASE_PATH}/s/${row.id}/art`;
+  const unlocked = data.unlockedAt
+    ? new Date(data.unlockedAt).toLocaleDateString("zh-CN")
+    : "";
+  const pct = Math.round((data.ratio || 0) * 100);
+  const progressText =
+    data.progress && data.progress.total
+      ? `已解锁 ${data.progress.unlocked}/${data.progress.total}`
+      : "";
+  const desc = data.unlockedAt
+    ? `${data.desc}（解锁于 ${unlocked}${progressText ? ` · ${progressText}` : ""}）`
+    : data.desc;
+
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>${escapeHtml(data.name)} · CodeQuest 成就</title>
+<meta name="description" content="${escapeHtml(desc || data.desc)}">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="CodeQuest">
+<meta property="og:title" content="${escapeHtml(data.name)} · CodeQuest 成就">
+<meta property="og:description" content="${escapeHtml(desc || data.desc)}">
+<meta property="og:image" content="${escapeHtml(artUrl)}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="${escapeHtml(artUrl)}">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 24px 16px; background: radial-gradient(1200px 600px at 50% -10%, #1b2340, #0b0f18 60%);
+    color: #e8ecf4; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+  .wrap { width: 100%; max-width: 420px; }
+  .card { position: relative; border-radius: 22px; padding: 22px 20px 18px; overflow: hidden;
+    background: linear-gradient(165deg, color-mix(in srgb, ${color} 26%, #141a28), #11161f 58%);
+    border: 1px solid color-mix(in srgb, ${color} 45%, transparent);
+    box-shadow: 0 24px 70px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06); }
+  .glow { position: absolute; inset: -60px -40px auto -40px; height: 220px; pointer-events: none;
+    background: radial-gradient(circle at 50% 0%, color-mix(in srgb, ${color} 55%, transparent), transparent 70%); filter: blur(18px); opacity: .7; }
+  .hero { position: relative; display: flex; gap: 14px; align-items: center; }
+  .art { width: 92px; height: 92px; flex: none; border-radius: 24px; overflow: hidden;
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, ${color} 65%, transparent), 0 10px 26px color-mix(in srgb, ${color} 35%, transparent); }
+  .art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  h1 { margin: 0 0 6px; font-size: 21px; letter-spacing: .01em; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 11px; padding: 3px 9px; border-radius: 999px; border: 1px solid rgba(255,255,255,.16); color: #cfd7e6; }
+  .chip.r { color: ${color}; border-color: color-mix(in srgb, ${color} 60%, transparent); font-weight: 700; }
+  .desc { position: relative; margin: 16px 0 0; font-size: 13px; line-height: 1.6; color: #b9c3d6; }
+  .cond { margin-top: 14px; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.07); font-size: 12.5px; line-height: 1.6; color: #d7dfee; }
+  .cond b { color: #fff; }
+  .bar { margin-top: 12px; height: 7px; border-radius: 999px; background: rgba(255,255,255,.1); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: ${pct}%; border-radius: 999px;
+    background: linear-gradient(90deg, ${color}, color-mix(in srgb, ${color} 55%, #fff)); }
+  .who { margin-top: 16px; display: flex; align-items: center; gap: 10px; font-size: 12px; color: #9aa6bd; }
+  .who img, .who .fb { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex: none;
+    background: linear-gradient(135deg,#4d6bfe,#a855f7); display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800; color: #fff; }
+  .who b { color: #e8ecf4; font-weight: 650; }
+  .foot { margin-top: 18px; text-align: center; font-size: 11.5px; color: #6f7b91; line-height: 1.7; }
+  .foot a { color: #8fa6ff; text-decoration: none; }
+  .stamp { position: absolute; right: 16px; bottom: 14px; font-size: 10px; font-weight: 800; letter-spacing: .08em;
+    color: #0b1220; background: linear-gradient(135deg,#f7c948,#f59e0b); padding: 3px 9px; border-radius: 999px;
+    box-shadow: 0 4px 14px rgba(245,158,11,.45); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="glow"></div>
+    <div class="hero">
+      <div class="art"><img src="${escapeHtml(artUrl)}" alt=""></div>
+      <div style="min-width:0">
+        <h1>${escapeHtml(data.name)}</h1>
+        <div class="chips">
+          <span class="chip r">${rarityLabel}</span>
+          ${data.categoryLabel ? `<span class="chip">${escapeHtml(data.categoryLabel)}</span>` : ""}
+          ${data.points ? `<span class="chip">+${data.points} 积分</span>` : ""}
+          ${progressText ? `<span class="chip">${escapeHtml(progressText)}</span>` : ""}
+        </div>
+      </div>
+    </div>
+    <p class="desc">${escapeHtml(data.desc)}</p>
+    ${data.cond ? `<div class="cond">达成条件：<b>${escapeHtml(data.cond)}</b>${data.unlockedAt ? `<div style="margin-top:8px;font-size:11.5px;color:#8f9ab0">✓ 已达成</div>` : `<div class="bar"><i></i></div>`}</div>` : ""}
+    <div class="who">
+      ${data.avatarUrl ? `<img src="${escapeHtml(data.avatarUrl)}" alt="" referrerpolicy="no-referrer">` : `<span class="fb">${escapeHtml((data.displayName || "?").slice(0, 1))}</span>`}
+      <span><b>${escapeHtml(data.displayName || "匿名玩家")}</b>${data.level ? ` · Lv.${data.level}` : ""}${unlocked ? ` · ${escapeHtml(unlocked)} 解锁` : ""}</span>
+    </div>
+    ${data.unlockedAt ? '<span class="stamp">已解锁</span>' : ""}
+  </div>
+  <p class="foot">CodeQuest · 用真实 DeepSeek Harness 用量驱动的成就系统<br>
+    <a href="${PUBLIC_BASE}${BASE_PATH}/s/${row.id}">${escapeHtml(shareUrl(row.id))}</a><br>
+    想自己也攒一面成就墙？<a href="https://guide.lukezystudio.cn/dsh-codequest/">看这里</a></p>
+</div>
+</body>
+</html>`;
+}
+
+app.get(`${BASE_PATH}/s/:id`, (req, res) => {
+  const row = db.prepare(`SELECT * FROM shares WHERE id = ?`).get(req.params.id);
+  if (!row) {
+    res.status(404).type("html").send(
+      `<!doctype html><meta charset="utf-8"><title>分享不存在</title>
+       <body style="background:#0b0f18;color:#e8ecf4;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+       <div style="text-align:center"><h2>这张卡片不存在或已删除</h2>
+       <p style="color:#7b8798;font-size:13px">CodeQuest · 成就系统</p></div></body>`
+    );
+    return;
+  }
+  db.prepare(`UPDATE shares SET views = views + 1 WHERE id = ?`).run(row.id);
+  res.type("html").send(renderSharePage(row));
+});
+
+app.get(`${BASE_PATH}/s/:id/art`, (req, res) => {
+  const row = db.prepare(`SELECT art, art_type FROM shares WHERE id = ?`).get(req.params.id);
+  if (!row || !row.art) return res.status(404).end();
+  res.type(row.art_type || "image/webp");
+  res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+  res.end(row.art);
 });
 
 /** —— Admin —— */
