@@ -6,15 +6,27 @@
 
 ## 安装
 
+**方式一：插件市场（推荐）**
+
+在 Harness 的「发现」页签里搜 `CodeQuest` 或 `成就`。市场索引地址：
+
+```
+https://raw.githubusercontent.com/MrLukezy/dsh-code-review/main/market/index.json
+```
+
+**方式二：直接从 GitHub 装**
+
+```
+plugin_manager { action: "install_bundle", target: "git+https://github.com/MrLukezy/dsh-codequest.git#v0.7.0" }
+```
+
+**方式三：本地目录**
+
 ```bash
 git clone https://github.com/MrLukezy/dsh-codequest.git
 ```
 
-然后在 DSH 里把它装成 bundle（路径指向仓库根目录）：
-
-```
-plugin_manager { action: "install_bundle", target: "<绝对路径>/dsh-codequest" }
-```
+然后把 target 指向仓库根目录的绝对路径。
 
 装好后插件行 id 是 `include:dsh-codequest`；改完 Host 代码用 disable → enable 重载，改完 Client 代码刷新页面。排行榜是可选功能，不配置也能单机玩。
 
