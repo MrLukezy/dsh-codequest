@@ -109,7 +109,9 @@ window.__ModuleLoader__.load({
         achCount: '成就数',
         emptyBoard: '排行榜暂无数据',
         loading: '加载中…',
-        serverHint: '填一个自建服务端的 API 地址，例如 https://你的域名/codequest/api。配置后这块就不再显示。',
+        serverHint: '默认已连上项目自带的排行榜服务器，地址不在界面显示。想换成自己的服务端，用下面的「改成我自己的服务器」。',
+        serverOverride: '改成我自己的服务器',
+        serverOverrideHint: 'https://你的域名/codequest/api（留空恢复默认）',
         save: '保存',
         hidden: '隐藏成就',
         secret: '???',
@@ -262,7 +264,9 @@ window.__ModuleLoader__.load({
         achCount: 'Achievements',
         emptyBoard: 'No leaderboard data yet',
         loading: 'Loading…',
-        serverHint: 'Point this at your own server, e.g. https://your-domain/codequest/api. This panel disappears once set.',
+        serverHint: 'The built-in leaderboard server is already configured; its address is never shown. Use the button below to point at your own.',
+        serverOverride: 'Use my own server',
+        serverOverrideHint: 'https://your-domain/codequest/api (leave blank for the default)',
         save: 'Save',
         hidden: 'Hidden',
         secret: '???',
@@ -2098,6 +2102,7 @@ function levelArtUrl(level) {
       const [identity, setIdentity] = useState(null);
       const [showEmail, setShowEmail] = useState(false);
       const [secret, setSecret] = useState('');
+      const [showBase, setShowBase] = useState(false);
 
       useEffect(() => {
         let alive = true;
@@ -2314,40 +2319,57 @@ function levelArtUrl(level) {
               )
             : null,
         ),
-        // Only when nothing is configured yet. Once an endpoint exists there
-        // is no reason to put it on screen — or in a screenshot — at all.
-        data.cloud.base
-          ? null
-          : h(
-              'div',
-              { className: 'cq-panel' },
-              h('h4', null, t('serverSettings')),
-              h('div', { className: 'cq-note', style: { marginTop: '4px' } }, t('serverHint')),
-              h(
+        // The endpoint is built in, so the address is never put on screen — or in a
+// screenshot. The panel stays reachable for the two things that still need
+// typing: the signing secret, and pointing at your own server.
+        h(
+          'div',
+          { className: 'cq-panel' },
+          h('h4', null, t('serverSettings')),
+          h('div', { className: 'cq-note', style: { marginTop: '4px' } }, t('serverHint')),
+          h('div', { className: 'cq-note', style: { marginTop: '10px' } }, t('sharedSecretHint')),
+          h(
+            'div',
+            { className: 'cq-actions' },
+            h('input', {
+              className: 'cq-input',
+              style: { flex: 1, minWidth: '220px' },
+              type: 'password',
+              placeholder: data.cloud.hasSecret ? t('sharedSecretSet') : t('sharedSecret'),
+              value: secret,
+              onChange: (e) => setSecret(e.target.value),
+            }),
+            h(
+              'button',
+              { className: 'cq-btn', type: 'button', disabled: busy, onClick: () => void call('/config', { sharedSecret: secret }, t('save')) },
+              t('save'),
+            ),
+          ),
+          h(
+            'button',
+            {
+              className: 'cq-btn',
+              type: 'button',
+              style: { marginTop: '10px' },
+              onClick: () => setShowBase(!showBase),
+            },
+            showBase ? t('hide') : t('serverOverride'),
+          ),
+          showBase
+            ? h(
                 'div',
                 { className: 'cq-actions', style: { marginTop: '10px' } },
-                h('input', { className: 'cq-input', style: { flex: 1, minWidth: '220px' }, value: base, onChange: (e) => setBase(e.target.value) }),
-                h('button', { className: 'cq-btn', type: 'button', disabled: busy, onClick: () => void call('/config', { cloudBase: base }, t('save')) }, t('save')),
-              ),
-              h('div', { className: 'cq-note', style: { marginTop: '10px' } }, t('sharedSecretHint')),
-              h(
-                'div',
-                { className: 'cq-actions' },
                 h('input', {
                   className: 'cq-input',
                   style: { flex: 1, minWidth: '220px' },
-                  type: 'password',
-                  placeholder: data.cloud.hasSecret ? t('sharedSecretSet') : t('sharedSecret'),
-                  value: secret,
-                  onChange: (e) => setSecret(e.target.value),
+                  placeholder: t('serverOverrideHint'),
+                  value: base,
+                  onChange: (e) => setBase(e.target.value),
                 }),
-                h(
-                  'button',
-                  { className: 'cq-btn', type: 'button', disabled: busy, onClick: () => void call('/config', { sharedSecret: secret }, t('save')) },
-                  t('save'),
-                ),
-              ),
-            ),
+                h('button', { className: 'cq-btn', type: 'button', disabled: busy, onClick: () => void call('/config', { cloudBase: base }, t('save')) }, t('save')),
+              )
+            : null,
+        ),
       );
     }
 

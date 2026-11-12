@@ -26,11 +26,13 @@ const PREFIX = '/dsh-codequest';
 const BUILD = '2026-11-13.1';
 
 /**
- * No endpoint ships with the package: a public repo must not point at the
- * author's own server. Set it per install through `POST /config {cloudBase}`
- * (stored in `state.json`) or the `DSH_CODEQUEST_CLOUD` environment variable.
+ * Ships pointing at the project's own leaderboard so a fresh install works out
+ * of the box: log in with the DeepSeek account and you are on the board.
+ * Override per install with the `DSH_CODEQUEST_CLOUD` environment variable or
+ * `POST /config {cloudBase}` (stored in `state.json`) to use your own server.
  */
-const DEFAULT_CLOUD_BASE = process.env.DSH_CODEQUEST_CLOUD || '';
+const DEFAULT_CLOUD_BASE =
+  process.env.DSH_CODEQUEST_CLOUD || 'https://www.lukezystudio.cn/codequest/api';
 const STATE_VERSION = 1;
 const LIVE_REFRESH_MS = 20_000;
 const AUTO_SCAN_MS = 10 * 60_000;
@@ -176,6 +178,9 @@ function topEntries(counts, limit) {
 
 export function apply(ctx) {
   const state = loadState();
+  // An install that saved an empty base (or predates the default) still ends
+  // up on the project server instead of showing "not configured".
+  if (!state.cloud.base) state.cloud.base = DEFAULT_CLOUD_BASE;
   const runtime = {
     metrics: null,
     evaluation: null,
@@ -547,10 +552,11 @@ export function apply(ctx) {
           } catch {
             return json(res, 400, { ok: false, error: 'invalid_json' });
           }
-          const base = typeof body.cloudBase === 'string' ? body.cloudBase.trim() : '';
-          if (base && !/^https?:\/\//i.test(base)) return json(res, 400, { ok: false, error: 'invalid_url' });
-          if (base) {
-            state.cloud.base = base.replace(/\/+$/, '');
+          // An empty string means "go back to the built-in endpoint".
+          if (typeof body.cloudBase === 'string') {
+            const base = body.cloudBase.trim();
+            if (base && !/^https?:\/\//i.test(base)) return json(res, 400, { ok: false, error: 'invalid_url' });
+            state.cloud.base = base ? base.replace(/\/+$/, '') : DEFAULT_CLOUD_BASE;
             cloud.base = state.cloud.base;
             save();
           }

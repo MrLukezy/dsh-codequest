@@ -180,6 +180,16 @@ for (let i = 0; i < 120; i += 1) {
   }
 }
 
+// A fresh install must already point at the built-in leaderboard, and an
+// explicit empty value must fall back to it rather than to "not configured".
+const finalState = await invoke('/dsh-codequest/state', 'GET');
+const freshBase = finalState.body.cloud.base;
+if (!/^https?:\/\//.test(freshBase)) throw new Error(`fresh install has no cloud base: ${freshBase}`);
+console.log('cloud base (built in):', freshBase);
+const cleared = await invoke('/dsh-codequest/config', 'POST', { cloudBase: '' });
+if (cleared.body.base !== freshBase) throw new Error(`empty cloudBase should restore the default, got ${cleared.body.base}`);
+console.log('cloud base (after clearing):', cleared.body.base);
+
 const leaderboard = await invoke('/dsh-codequest/cloud/leaderboard', 'POST', {});
 console.log('\nleaderboard:', leaderboard.status, JSON.stringify(leaderboard.body).slice(0, 300));
 
