@@ -65,6 +65,7 @@ function walk(node, stats = { elements: 0, text: [] }) {
     }
     if (node.type === 'section') stats.sections = (stats.sections || 0) + 1;
     if (node.props && node.props.className === 'cq-card') stats.cards = (stats.cards || 0) + 1;
+    if (node.props && node.props.className === 'cq-card cq-secretcard') stats.secretTiles = (stats.secretTiles || 0) + 1;
     if (node.type === 'img' && node.props && typeof node.props.src === 'string') {
       stats.images = (stats.images || 0) + 1;
       if (!/\/(icon|level)\/[a-z0-9_]+\.webp$/.test(node.props.src)) throw new Error(`bad art url: ${node.props.src}`);
@@ -83,6 +84,14 @@ for (const name of ['LevelHeader', 'AchievementsTab', 'DashboardTab']) {
   const stats = walk(tree);
   console.log(`${name}: elements=${stats.elements} sections=${stats.sections || 0} cards=${stats.cards || 0} images=${stats.images || 0} textNodes=${stats.text.length}`);
   if (stats.elements < 10) throw new Error(`${name} rendered almost nothing`);
+  if (name === 'AchievementsTab') {
+    const total = payload.achievements.length;
+    const secret = payload.achievements.filter((item) => item.secret).length;
+    // Undiscovered goals collapse into one tile per category instead of blanks.
+    if (stats.cards >= total) throw new Error('secret achievements were not collapsed');
+    if (!stats.secretTiles) throw new Error('missing secret summary tile');
+    console.log('  secrets=%d collapsed=%d cards=%d', secret, total - secret, stats.cards);
+  }
 }
 
 // Overlay entries read the shared store, so seed it the way a poll would.
@@ -113,6 +122,17 @@ if (!liveText.includes('12.35M')) throw new Error('HUD did not read the live tok
 console.log('QuestHud live: elements=%d', liveHud.elements);
 mod.__store.live = null;
 mod.__store.float = null;
+// A secret goal must not leak its name or condition anywhere in the modal.
+const secretItem = payload.achievements.find((item) => item.secret);
+if (secretItem) {
+  const secretDetail = walk(views.AchievementDetail({ item: secretItem, t, onClose: () => {} }));
+  const secretText = secretDetail.text.join(' ');
+  if (secretText.includes(secretItem.name)) throw new Error('secret detail leaked the name');
+  if (secretText.includes(secretItem.cond)) throw new Error('secret detail leaked the condition');
+  if (!secretDetail.text.includes('secret')) throw new Error('secret detail did not mark itself');
+  console.log('SecretDetail: elements=%d leaked=false', secretDetail.elements);
+}
+
 const unlockedItem = payload.achievements.find((item) => item.unlockedAt && item.art);
 const detail = walk(views.AchievementDetail({ item: unlockedItem, t, onClose: () => {} }));
 console.log('AchievementDetail: elements=%d images=%d', detail.elements, detail.images || 0);
@@ -129,12 +149,14 @@ console.log('categories:', [...categories].join(', '), '| sections:', wall.secti
 if (wall.sections !== categories.size) {
   throw new Error(`expected ${categories.size} category sections, got ${wall.sections}`);
 }
-if (wall.cards !== payload.achievements.length) {
-  throw new Error(`expected ${payload.achievements.length} cards, got ${wall.cards}`);
+// Undiscovered goals are collapsed, so the wall shows fewer cards than the
+// catalog — but the totals in the headers still count all of them.
+const secretItems = payload.achievements.filter((item) => item.secret);
+if (wall.cards !== payload.achievements.length - secretItems.length) {
+  throw new Error(`expected ${payload.achievements.length - secretItems.length} cards, got ${wall.cards}`);
 }
-// Every non-secret card must show real badge art, not the emoji fallback.
-const secrets = payload.achievements.filter((item) => item.hidden && !item.unlockedAt).length;
-if (wall.images !== payload.achievements.length - secrets) {
-  throw new Error(`expected ${payload.achievements.length - secrets} badge images, got ${wall.images}`);
+// Every visible card must show real badge art, not the emoji fallback.
+if (wall.images !== wall.cards) {
+  throw new Error(`expected ${wall.cards} badge images, got ${wall.images}`);
 }
 console.log('OK');

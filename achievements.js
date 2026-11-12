@@ -36,6 +36,13 @@ export const CATEGORY_LABELS = {
 /** Points per rarity; a definition may override with `extra.points`. */
 const P = { common: 10, rare: 20, epic: 40, legendary: 80 };
 
+/**
+ * Reveal threshold for secret achievements: once a goal is this close (0..1)
+ * the card flips from a lock to its real name so the last stretch is visible.
+ * Easter eggs ignore this and stay locked until they actually fire.
+ */
+const SECRET_REVEAL_RATIO = 0.6;
+
 const a = (id, name, desc, cond, icon, rarity, category, target, metric, extra) => ({
   id,
   name,
@@ -503,6 +510,19 @@ export function evaluate(metrics, unlockedAt, now = Date.now(), extra = {}) {
       category: def.category,
       points: def.points,
       hidden: Boolean(def.hidden),
+      /**
+       * Secret: the wall shows a lock instead of the name and description.
+       * Most achievements start secret and reveal themselves once they are
+       * unlocked or close enough to be worth teasing; easter eggs never leak
+       * early, so they stay locked until they actually fire.
+       */
+      secret:
+        !hit &&
+        (def.hidden
+          ? true
+          : // Common-tier goals are the on-ramp: always visible so a new
+            // profile still has something concrete to chase.
+            def.points > P.common && ratio < SECRET_REVEAL_RATIO),
       target,
       value: Math.round(value),
       ratio: Number(ratio.toFixed(4)),

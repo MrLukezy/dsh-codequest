@@ -122,6 +122,14 @@ window.__ModuleLoader__.load({
         hudClose: '收起',
         hudHide: '不再显示',
         hudDrag: '按住拖动可移动，双击回到默认位置',
+        secret: '未揭晓',
+        secretHint: '满足条件后自动揭晓',
+        secretReveal: '这是一枚隐藏成就，达成时会直接弹出来告诉你',
+        secretCount: '还有这么多没揭晓：',
+        secretUnit: '枚未揭晓',
+        revealOff: '揭晓全部（剧透）',
+        revealOn: '收起剧透',
+        revealHint: '临时显示所有成就的名字和条件',
         show: '显示',
         hide: '隐藏',
         hudShow: '悬浮窗',
@@ -248,6 +256,14 @@ window.__ModuleLoader__.load({
         hudClose: 'Collapse',
         hudHide: 'Hide',
         hudDrag: 'Drag to move, double-click to reset',
+        secret: 'Undiscovered',
+        secretHint: 'Unlocks itself once you meet the condition',
+        secretReveal: 'A hidden achievement — it will reveal itself the moment you earn it',
+        secretCount: 'Still hidden:',
+        secretUnit: 'undiscovered',
+        revealOff: 'Reveal all (spoilers)',
+        revealOn: 'Hide spoilers',
+        revealHint: 'Temporarily show every name and condition',
         show: 'Show',
         hide: 'Hide',
         hudShow: 'Floating HUD',
@@ -443,6 +459,13 @@ function levelArtUrl(level) {
 .cq-overlay{position:fixed;right:16px;bottom:92px;z-index:60;display:flex;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:none;max-width:min(320px,calc(100vw - 32px))}
 .cq-overlay>*{pointer-events:auto}
 .cq-hud{display:flex;flex-direction:column;align-items:flex-end}
+.cq-secretcard{grid-column:span 1;border-style:dashed;background:color-mix(in srgb,var(--dsw-alias-label-secondary,#5b6472) 5%,transparent);color:var(--dsw-alias-label-secondary,#5b6472);cursor:pointer}
+.cq-secretcard .cq-icon{filter:none;opacity:.85}
+.cq-secretcard:hover{background:color-mix(in srgb,#4d6bfe 8%,transparent)}
+.cq-card.secret{border-style:dashed;opacity:.72}
+.cq-card.secret .cq-cname{color:var(--dsw-alias-label-secondary,#5b6472);font-weight:600}
+.cq-card.secret .cq-icon{filter:grayscale(1);opacity:.75}
+.cq-secretnote{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--dsw-alias-label-secondary,#5b6472);border:1px dashed var(--dsw-alias-border-l2,#e3e6eb);border-radius:10px;padding:7px 11px;background:color-mix(in srgb,var(--dsw-alias-label-secondary,#5b6472) 4%,transparent)}
 .cq-drag{cursor:grab;touch-action:none;user-select:none}
 .cq-drag:active{cursor:grabbing}
 .cq-floats{position:absolute;inset:0;pointer-events:none}
@@ -731,18 +754,20 @@ function levelArtUrl(level) {
     function AchievementCard({ item, t, onOpen }) {
       const rarity = RARITY[item.rarity] || RARITY.common;
       const locked = !item.unlockedAt;
-      const secret = locked && item.hidden;
+      // `secret` comes from the Host: most goals stay locked-and-blank until
+      // they are unlocked or close enough to be worth teasing.
+      const secret = locked && (item.secret || item.hidden);
       const pct = Math.round(item.ratio * 100);
       const artUrl = item.art ? `${apiBase()}/icon/${item.art}.webp` : null;
       return h(
         'div',
         {
-          className: `cq-card${locked ? ' locked' : ' on'}`,
-          style: { '--cq-r': rarity.color },
-          'data-r': item.rarity,
+          className: `cq-card${locked ? ' locked' : ' on'}${secret ? ' secret' : ''}`,
+          style: { '--cq-r': secret ? '#8b93a3' : rarity.color },
+          'data-r': secret ? 'secret' : item.rarity,
           role: 'button',
           tabIndex: 0,
-          title: `${item.cond}\n${fmtInt(item.value)} / ${fmtInt(item.target)}`,
+          title: secret ? t('secretHint') : `${item.cond}\n${fmtInt(item.value)} / ${fmtInt(item.target)}`,
           onClick: onOpen,
           onKeyDown: (event) => {
             if (event.key === 'Enter' || event.key === ' ') {
@@ -771,7 +796,7 @@ function levelArtUrl(level) {
           h(
             'span',
             { style: { display: artUrl && !secret ? 'none' : 'flex' } },
-            secret ? '❓' : item.icon,
+            secret ? '🔒' : item.icon,
           ),
         ),
         locked ? h('span', { className: 'cq-lock' }, '🔒') : null,
@@ -784,9 +809,13 @@ function levelArtUrl(level) {
             secret ? t('secret') : item.name,
             h('span', { className: 'cq-pts' }, `+${item.points}`),
           ),
-          h('div', { className: 'cq-cdesc' }, secret ? t('hidden') : item.desc),
-          h('div', { className: 'cq-prog' }, h('i', { style: { width: `${locked ? pct : 100}%` } })),
-          h('div', { className: 'cq-meta' }, locked ? `${pct}%` : new Date(item.unlockedAt).toLocaleDateString()),
+          h('div', { className: 'cq-cdesc' }, secret ? t('secretHint') : item.desc),
+          h(
+            'div',
+            { className: 'cq-prog' },
+            h('i', { style: { width: secret ? '0%' : `${locked ? pct : 100}%` } }),
+          ),
+          h('div', { className: 'cq-meta' }, secret ? '???' : locked ? `${pct}%` : new Date(item.unlockedAt).toLocaleDateString()),
         ),
       );
     }
@@ -1152,6 +1181,24 @@ function levelArtUrl(level) {
       );
     }
 
+    /** Spoiler switch for the wall: off keeps unearned goals hidden. */
+    const REVEAL_KEY = 'dsh-codequest.reveal';
+
+    function readReveal() {
+      try {
+        return window.localStorage.getItem(REVEAL_KEY) === '1';
+      } catch {
+        return false;
+      }
+    }
+
+    function writeReveal(on) {
+      try {
+        window.localStorage.setItem(REVEAL_KEY, on ? '1' : '0');
+      } catch {
+        /* private mode: the switch just does not survive a reload */
+      }
+    }
     /** Sort modes shared by the wall: default grouping, closest-to-unlock, recent. */
     const SORT_MODES = ['default', 'closest', 'rare', 'recent'];
 
@@ -1160,13 +1207,18 @@ function levelArtUrl(level) {
       const [detail, setDetail] = useState(null);
       const [query, setQuery] = useState('');
       const [sort, setSort] = useState('default');
+      // Spoiler switch: off means secret goals stay blank until they unlock.
+      const [reveal, setReveal] = useState(readReveal);
 
       const needle = query.trim().toLowerCase();
 
       const groups = useMemo(() => {
         const buckets = new Map();
         for (const item of data.achievements || []) {
+          const secret = !item.unlockedAt && (item.secret || item.hidden) && !reveal;
           if (needle) {
+            // A secret card has no readable text, so it can never match a query.
+            if (secret) continue;
             const hay = `${item.name} ${item.desc} ${item.cond} ${item.id}`.toLowerCase();
             if (!hay.includes(needle)) continue;
           }
@@ -1174,7 +1226,11 @@ function levelArtUrl(level) {
           buckets.get(item.category).push(item);
         }
         return CATEGORY_ORDER.filter((key) => buckets.has(key)).map((key) => {
-          const items = buckets.get(key);
+          const bucket = buckets.get(key);
+          // Secrets are collapsed into one summary tile: the wall shows what you
+          // have and what you are close to, not 200 blank slots.
+          const isSecret = (item) => !item.unlockedAt && (item.secret || item.hidden) && !reveal;
+          const items = reveal ? bucket : bucket.filter((item) => !isSecret(item));
           const sorted = [...items].sort((a, b) => {
             if (sort === 'closest') {
               const left = a.unlockedAt ? 2 : a.ratio;
@@ -1189,18 +1245,22 @@ function levelArtUrl(level) {
               return (b.unlockedAt || 0) - (a.unlockedAt || 0);
             }
             if (Boolean(a.unlockedAt) !== Boolean(b.unlockedAt)) return a.unlockedAt ? -1 : 1;
+            const aSecret = !a.unlockedAt && (a.secret || a.hidden) && !reveal ? 1 : 0;
+            const bSecret = !b.unlockedAt && (b.secret || b.hidden) && !reveal ? 1 : 0;
+            if (aSecret !== bSecret) return aSecret - bSecret;
             return b.ratio - a.ratio;
           });
           return {
             key,
             items: sorted,
-            unlocked: items.filter((item) => item.unlockedAt).length,
-            total: items.length,
-            points: items.reduce((sum, item) => sum + (item.unlockedAt ? item.points : 0), 0),
-            maxPoints: items.reduce((sum, item) => sum + item.points, 0),
+            secret: bucket.filter((item) => isSecret(item)).length,
+            unlocked: bucket.filter((item) => item.unlockedAt).length,
+            total: bucket.length,
+            points: bucket.reduce((sum, item) => sum + (item.unlockedAt ? item.points : 0), 0),
+            maxPoints: bucket.reduce((sum, item) => sum + item.points, 0),
           };
         });
-      }, [data.achievements, needle, sort]);
+      }, [data.achievements, needle, sort, reveal]);
 
       // "最近解锁" timeline: newest first, independent of the current filter.
       const recent = useMemo(
@@ -1215,6 +1275,13 @@ function levelArtUrl(level) {
       const visible = category === 'all' ? groups : groups.filter((group) => group.key === category);
       const chips = [['all', t('all')], ...groups.map((group) => [group.key, t(group.key)])];
       const shown = groups.reduce((sum, group) => sum + group.total, 0);
+      const all = data.achievements || [];
+      const secrets = reveal ? 0 : all.filter((item) => !item.unlockedAt && (item.secret || item.hidden)).length;
+      const toggleReveal = () => {
+        const next = !reveal;
+        setReveal(next);
+        writeReveal(next);
+      };
 
       return h(
         'div',
@@ -1244,10 +1311,26 @@ function levelArtUrl(level) {
               ),
             ),
           ),
-          needle
-            ? h('span', { className: 'cq-note' }, `${shown} / ${(data.achievements || []).length}`)
-            : null,
+          h(
+            'button',
+            {
+              type: 'button',
+              className: `cq-fchip${reveal ? ' on' : ''}`,
+              onClick: toggleReveal,
+              title: t('revealHint'),
+            },
+            reveal ? t('revealOn') : t('revealOff'),
+          ),
+          needle ? h('span', { className: 'cq-note' }, `${shown} / ${all.length}`) : null,
         ),
+        secrets > 0
+          ? h(
+              'div',
+              { className: 'cq-secretnote' },
+              h('span', null, `🔒 ${t('secretCount')} ${secrets}`),
+              h('span', { className: 'cq-note' }, t('secretHint')),
+            )
+          : null,
         recent.length > 0
           ? h(
               'div',
@@ -1312,6 +1395,24 @@ function levelArtUrl(level) {
               'div',
               { className: 'cq-grid' },
               group.items.map((item) => h(AchievementCard, { key: item.id, item, t, onOpen: () => setDetail(item) })),
+              group.secret > 0
+                ? h(
+                    'button',
+                    {
+                      type: 'button',
+                      className: 'cq-card cq-secretcard',
+                      onClick: toggleReveal,
+                      title: t('revealHint'),
+                    },
+                    h('div', { className: 'cq-icon' }, h('span', { style: { display: 'flex' } }, '🔒')),
+                    h(
+                      'div',
+                      { style: { minWidth: 0, flex: 1 } },
+                      h('div', { className: 'cq-cname' }, `${group.secret} ${t('secretUnit')}`),
+                      h('div', { className: 'cq-cdesc' }, t('secretHint')),
+                    ),
+                  )
+                : null,
             ),
           ),
         ),
@@ -1330,7 +1431,7 @@ function levelArtUrl(level) {
       }, [onClose]);
 
       const rarity = RARITY[item.rarity] || RARITY.common;
-      const secret = item.hidden && !item.unlockedAt;
+      const secret = !item.unlockedAt && (item.secret || item.hidden);
       const pct = Math.round(item.ratio * 100);
       const remaining = Math.max(0, item.target - item.value);
 
@@ -1341,7 +1442,7 @@ function levelArtUrl(level) {
           'div',
           {
             className: 'cq-modalbox',
-            style: { '--cq-r': rarity.color },
+            style: { '--cq-r': secret ? '#8b93a3' : rarity.color },
             onClick: (event) => event.stopPropagation(),
             role: 'dialog',
             'aria-modal': 'true',
@@ -1354,12 +1455,12 @@ function levelArtUrl(level) {
               { className: 'cq-modalart' },
               item.art && !secret
                 ? h('img', { src: `${apiBase()}/icon/${item.art}.webp`, alt: '' })
-                : h('span', null, secret ? '❓' : item.icon),
+                : h('span', null, secret ? '🔒' : item.icon),
             ),
             h(
               'div',
               { style: { minWidth: 0, flex: 1 } },
-              h('div', { className: 'cq-modaltitle' }, secret ? t('hidden') : item.name),
+              h('div', { className: 'cq-modaltitle' }, secret ? t('secret') : item.name),
               h(
                 'div',
                 { className: 'cq-modalchips' },
@@ -1370,39 +1471,39 @@ function levelArtUrl(level) {
             ),
             h('button', { type: 'button', className: 'cq-modalx', onClick: onClose, 'aria-label': t('close') }, '✕'),
           ),
-          h('div', { className: 'cq-modaldesc' }, secret ? t('hiddenHint') : item.desc),
-          h(
-            'div',
-            { className: 'cq-modalsection' },
-            h('div', { className: 'cq-modallabel' }, t('condition')),
-            h('div', { className: 'cq-modalvalue' }, item.cond),
-          ),
-          h(
-            'div',
-            { className: 'cq-modalsection' },
-            h(
-              'div',
-              { className: 'cq-modallabel' },
-              t('progress'),
-              h(
-                'b',
-                null,
-                secret
-                  ? '—'
-                  : `${fmtInt(Math.min(item.value, item.target))} / ${fmtInt(item.target)}  (${pct}%)`,
+          h('div', { className: 'cq-modaldesc' }, secret ? t('secretHint') : item.desc),
+          secret
+            ? null
+            : h(
+                'div',
+                { className: 'cq-modalsection' },
+                h('div', { className: 'cq-modallabel' }, t('condition')),
+                h('div', { className: 'cq-modalvalue' }, item.cond),
               ),
-            ),
-            h('div', { className: 'cq-prog big' }, h('i', { style: { width: `${Math.min(100, pct)}%` } })),
-            h(
-              'div',
-              { className: 'cq-modalnote' },
-              item.unlockedAt
-                ? `${t('unlockedAt')} ${new Date(item.unlockedAt).toLocaleString()}`
-                : secret
-                  ? t('hiddenHint')
-                  : `${t('remaining')} ${fmtInt(remaining)}`,
-            ),
-          ),
+          secret
+            ? h(
+                'div',
+                { className: 'cq-modalsection' },
+                h('div', { className: 'cq-modalnote' }, t('secretReveal')),
+              )
+            : h(
+                'div',
+                { className: 'cq-modalsection' },
+                h(
+                  'div',
+                  { className: 'cq-modallabel' },
+                  t('progress'),
+                  h('b', null, `${fmtInt(Math.min(item.value, item.target))} / ${fmtInt(item.target)}  (${pct}%)`),
+                ),
+                h('div', { className: 'cq-prog big' }, h('i', { style: { width: `${Math.min(100, pct)}%` } })),
+                h(
+                  'div',
+                  { className: 'cq-modalnote' },
+                  item.unlockedAt
+                    ? `${t('unlockedAt')} ${new Date(item.unlockedAt).toLocaleString()}`
+                    : `${t('remaining')} ${fmtInt(remaining)}`,
+                ),
+              ),
         ),
       );
     }
