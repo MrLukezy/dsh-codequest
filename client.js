@@ -150,6 +150,15 @@ window.__ModuleLoader__.load({
         sharedSecretSet: '已设置，留空不修改',
         sharedSecretHint: '免密登录的签名密钥，需与服务端 DSH_SHARED_SECRET 一致',
         working: '处理中…',
+        today: '今日',
+        toolKinds: '种工具',
+        toolErrors: '失败',
+        overview: '概览',        peakDay: '峰值',
+        peakHour: '高峰',
+        avgDay: '日均',
+        cacheRead: '缓存读取',
+        promptChars: '输入字数',
+        codeBlocks: '代码块',
       },
       en: {
         tab: 'CodeQuest',
@@ -284,6 +293,15 @@ window.__ModuleLoader__.load({
         sharedSecretSet: 'Already set — leave blank to keep',
         sharedSecretHint: 'Signing key for passwordless login; must match the server DSH_SHARED_SECRET',
         working: 'Working…',
+        today: 'today',
+        toolKinds: 'kinds',
+        toolErrors: 'errors',
+        overview: 'Overview',        peakDay: 'Peak',
+        peakHour: 'Peak',
+        avgDay: 'Daily avg',
+        cacheRead: 'cache read',
+        promptChars: 'Prompt chars',
+        codeBlocks: 'Code blocks',
       },
     };
 
@@ -459,6 +477,48 @@ function levelArtUrl(level) {
 .cq-overlay{position:fixed;right:16px;bottom:92px;z-index:60;display:flex;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:none;max-width:min(320px,calc(100vw - 32px))}
 .cq-overlay>*{pointer-events:auto}
 .cq-hud{display:flex;flex-direction:column;align-items:flex-end}
+.cq-dash{display:flex;flex-direction:column;gap:12px}
+.cq-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px}
+.cq-kpi{position:relative;overflow:hidden;border:1px solid var(--dsw-alias-border-l2,#e3e6eb);border-radius:14px;padding:11px 13px 10px;background:linear-gradient(150deg,color-mix(in srgb,var(--cq-k,#4d6bfe) 10%,var(--dsw-alias-bg-layer-1,#fff)),var(--dsw-alias-bg-layer-1,#fff) 62%)}
+.cq-kpi::after{content:'';position:absolute;right:-18px;top:-18px;width:52px;height:52px;border-radius:50%;background:color-mix(in srgb,var(--cq-k,#4d6bfe) 16%,transparent)}
+.cq-kpi-l{font-size:10.5px;font-weight:700;letter-spacing:.03em;color:var(--dsw-alias-label-secondary,#5b6472)}
+.cq-kpi-v{margin-top:3px;font-size:21px;font-weight:800;line-height:1.1;color:var(--cq-k,#4d6bfe);font-variant-numeric:tabular-nums}
+.cq-kpi-s{margin-top:3px;font-size:10.5px;color:var(--dsw-alias-label-secondary,#5b6472);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cq-panelhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:9px}
+.cq-panelhead h4{margin:0}
+.cq-trend{position:relative}
+.cq-trendsvg{display:block;width:100%;height:96px;overflow:visible}
+.cq-trendfoot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:4px;font-size:10.5px;color:var(--dsw-alias-label-secondary,#5b6472);font-variant-numeric:tabular-nums}
+.cq-trendpeak{color:#a855f7;font-weight:700}
+.cq-trenddot{position:absolute;width:7px;height:7px;border-radius:50%;background:#a855f7;box-shadow:0 0 0 3px color-mix(in srgb,#a855f7 22%,transparent);transform:translate(-50%,-50%);pointer-events:none}
+.cq-grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.cq-grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.cq-rankl{display:flex;flex-direction:column;gap:6px}
+.cq-rankrow{display:grid;grid-template-columns:16px minmax(48px,1fr) 1.3fr 54px;align-items:center;gap:8px;font-size:11.5px}
+.cq-rk{font-size:9.5px;font-weight:800;color:var(--dsw-alias-label-secondary,#5b6472);opacity:.7}
+.cq-rn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cq-rn.mono{font-family:var(--ds-font-family-code,monospace);font-size:11px}
+.cq-rt{position:relative;height:6px;border-radius:999px;background:color-mix(in srgb,var(--dsw-alias-label-secondary,#5b6472) 12%,transparent);overflow:hidden}
+.cq-rt i{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:linear-gradient(90deg,#4d6bfe,#8b5cf6)}
+.cq-rv{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;font-size:11px}
+.cq-hourbars{display:grid;grid-template-columns:repeat(24,1fr);align-items:end;gap:3px;height:82px}
+.cq-hourbars i{display:block;border-radius:3px 3px 1px 1px;background:linear-gradient(180deg,color-mix(in srgb,#4d6bfe 72%,transparent),color-mix(in srgb,#8b5cf6 42%,transparent));min-height:4px}
+.cq-hourbars i.peak{background:linear-gradient(180deg,#a855f7,#4d6bfe)}
+.cq-hourfoot{display:flex;justify-content:space-between;margin-top:5px;font-size:9.5px;color:var(--dsw-alias-label-secondary,#5b6472)}
+.cq-hourpeak{color:#a855f7;font-weight:700}
+.cq-stack{display:flex;height:10px;border-radius:999px;overflow:hidden;background:color-mix(in srgb,var(--dsw-alias-label-secondary,#5b6472) 10%,transparent)}
+.cq-stack i{display:block;height:100%}
+.cq-legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:9px;font-size:10.5px;color:var(--dsw-alias-label-secondary,#5b6472)}
+.cq-legend span{display:flex;align-items:center;gap:4px}
+.cq-legend i{width:7px;height:7px;border-radius:50%;display:block}
+.cq-legend b{color:var(--dsw-alias-label-primary,#1f2328);font-variant-numeric:tabular-nums}
+.cq-mini{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;font-size:10.5px;color:var(--dsw-alias-label-secondary,#5b6472)}
+.cq-mini span{border:1px solid var(--dsw-alias-border-l2,#e3e6eb);border-radius:999px;padding:2px 9px;background:var(--dsw-alias-bg-layer-2,#f6f7f9)}
+.cq-signals{display:flex;flex-wrap:wrap;gap:6px}
+.cq-sig{position:relative;display:flex;align-items:center;gap:6px;border:1px solid var(--dsw-alias-border-l2,#e3e6eb);border-radius:999px;padding:3px 10px 3px 11px;font-size:11px;overflow:hidden;background:var(--dsw-alias-bg-layer-1,#fff)}
+.cq-sig::before{content:'';position:absolute;inset:0 auto 0 0;width:var(--w,10%);background:linear-gradient(90deg,color-mix(in srgb,#4d6bfe 16%,transparent),transparent)}
+.cq-sig em{position:relative;font-style:normal;color:var(--dsw-alias-label-primary,#1f2328)}
+.cq-sig b{position:relative;font-variant-numeric:tabular-nums;color:#4d6bfe}
 .cq-secretcard{grid-column:span 1;border-style:dashed;background:color-mix(in srgb,var(--dsw-alias-label-secondary,#5b6472) 5%,transparent);color:var(--dsw-alias-label-secondary,#5b6472);cursor:pointer}
 .cq-secretcard .cq-icon{filter:none;opacity:.85}
 .cq-secretcard:hover{background:color-mix(in srgb,#4d6bfe 8%,transparent)}
@@ -1508,178 +1568,322 @@ function levelArtUrl(level) {
       );
     }
 
-    function DashboardTab({ data, t }) {
-      const s = data.stats;
-      const daily = Object.entries(s.dailyTokens || {}).sort(([a], [b]) => (a < b ? -1 : 1)).slice(-30);
-      const maxDaily = daily.reduce((max, [, value]) => Math.max(max, value), 0) || 1;
-      const maxHour = (s.hourly || []).reduce((max, value) => Math.max(max, value), 0) || 1;
-      const maxTool = (s.topTools || []).reduce((max, item) => Math.max(max, item.value), 0) || 1;
-      const maxExt = (s.topExts || []).reduce((max, item) => Math.max(max, item.value), 0) || 1;
-      const maxCmd = (s.topCmds || []).reduce((max, item) => Math.max(max, item.value), 0) || 1;
+    /** One big number with a label: the first thing the eye lands on. */
+    function StatTile({ label, value, sub, tone }) {
+      return h(
+        'div',
+        { className: 'cq-kpi', style: tone ? { '--cq-k': tone } : null },
+        h('div', { className: 'cq-kpi-l' }, label),
+        h('div', { className: 'cq-kpi-v' }, value),
+        sub ? h('div', { className: 'cq-kpi-s' }, sub) : null,
+      );
+    }
+
+    /** 30-day token trend as a filled area chart with a peak marker. */
+    function TrendChart({ daily, t }) {
+      const W = 320;
+      const H = 92;
+      const values = daily.map(([, value]) => value);
+      const max = Math.max(1, ...values);
+      const step = values.length > 1 ? W / (values.length - 1) : W;
+      const points = values.map((value, index) => {
+        const x = index * step;
+        const y = H - 6 - (value / max) * (H - 16);
+        return [x, y];
+      });
+      const line = points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+      const area = `0,${H} ${line} ${W},${H}`;
+      const peakIndex = values.indexOf(max);
+      const peak = points[peakIndex] || [0, H];
+      const label = (index) => (daily[index] ? daily[index][0].slice(5) : '');
 
       return h(
         'div',
-        { style: { display: 'flex', flexDirection: 'column', gap: '10px' } },
+        { className: 'cq-trend' },
         h(
-          'div',
-          { className: 'cq-panel' },
-          h('h4', null, t('recent')),
+          'svg',
+          { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none', className: 'cq-trendsvg' },
           h(
-            'div',
-            { className: 'cq-bars' },
-            daily.map(([date, value]) =>
-              h('div', {
-                key: date,
-                style: { height: `${Math.max(3, (value / maxDaily) * 100)}%` },
-                title: `${date}: ${fmtTokens(value)}`,
-              }),
-            ),
-          ),
-        ),
-        h(
-          'div',
-          { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: '10px' } },
-          h(
-            'div',
-            { className: 'cq-panel' },
-            h('h4', null, t('topTools')),
+            'defs',
+            null,
             h(
-              'div',
-              { className: 'cq-list' },
-              (s.topTools || []).map((item) =>
-                h(
-                  'div',
-                  { className: 'cq-row', key: item.key },
-                  h('span', { style: { fontFamily: 'var(--ds-font-family-code,monospace)' } }, item.key),
-                  h('span', { className: 'bar', style: { width: `${(item.value / maxTool) * 46}px` } }),
-                  h('b', null, fmtInt(item.value)),
-                ),
-              ),
+              'linearGradient',
+              { id: 'cqTrendFill', x1: '0', y1: '0', x2: '0', y2: '1' },
+              h('stop', { offset: '0%', stopColor: '#4d6bfe', stopOpacity: '0.42' }),
+              h('stop', { offset: '100%', stopColor: '#4d6bfe', stopOpacity: '0.02' }),
             ),
           ),
-          h(
-            'div',
-            { className: 'cq-panel' },
-            h('h4', null, t('hourly')),
-            h(
-              'div',
-              { className: 'cq-hours' },
-              (s.hourly || []).map((value, hour) =>
-                h('i', {
-                  key: hour,
-                  title: `${hour}:00 · ${fmtTokens(value)}`,
-                  style: { '--a': `${Math.max(6, Math.round((value / maxHour) * 95))}%` },
-                }),
-              ),
-            ),
-            h('h4', { style: { marginTop: '12px' } }, t('sentiment')),
-            h(
-              'div',
-              { className: 'cq-sent' },
-              ['praise', 'insult', 'pua', 'beg', 'blame'].map((key) =>
-                h('span', { key }, t(key), h('b', null, fmtInt(s.sentiment[key]))),
-              ),
-            ),
-          ),
+          h('polygon', { points: area, fill: 'url(#cqTrendFill)' }),
+          h('polyline', {
+            points: line,
+            fill: 'none',
+            stroke: '#4d6bfe',
+            strokeWidth: 1.8,
+            strokeLinejoin: 'round',
+            strokeLinecap: 'round',
+            vectorEffect: 'non-scaling-stroke',
+          }),
         ),
+        h('i', {
+          className: 'cq-trenddot',
+          style: {
+            left: `${daily.length > 1 ? (peakIndex / (daily.length - 1)) * 100 : 50}%`,
+            top: `${(peak[1] / H) * 96}px`,
+          },
+        }),
         h(
           'div',
-          { className: 'cq-panel' },
-          h('h4', null, t('persona')),
-          h(
-            'div',
-            { className: 'cq-sent' },
-            (s.topSignals || []).map((item) =>
-              h('span', { key: item.key }, SIGNAL_LABELS[item.key] || item.key, h('b', null, fmtInt(item.value))),
-            ),
-          ),
+          { className: 'cq-trendfoot' },
+          h('span', null, label(0)),
+          h('span', { className: 'cq-trendpeak' }, `${t('peakDay')} ${fmtTokens(max)}`),
+          h('span', null, label(daily.length - 1)),
         ),
-        h(
-          'div',
-          { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: '10px' } },
+      );
+    }
+
+    /** Ranked list with a proportional track: tools, file types, commands. */
+    function RankList({ items, format, mono, prefix }) {
+      if (!items || items.length === 0) return h('div', { className: 'cq-empty' }, '—');
+      const max = items.reduce((top, item) => Math.max(top, item.value), 0) || 1;
+      return h(
+        'div',
+        { className: 'cq-rankl' },
+        items.map((item, index) =>
           h(
             'div',
-            { className: 'cq-panel' },
-            h('h4', null, t('files')),
-            h(
-              'div',
-              { className: 'cq-list' },
-              (s.topExts || []).map((item) =>
-                h(
-                  'div',
-                  { className: 'cq-row', key: item.key },
-                  h('span', { style: { fontFamily: 'var(--ds-font-family-code,monospace)' } }, `.${item.key}`),
-                  h('span', { className: 'bar', style: { width: `${(item.value / maxExt) * 46}px` } }),
-                  h('b', null, fmtInt(item.value)),
-                ),
-              ),
-            ),
-          ),
-          h(
-            'div',
-            { className: 'cq-panel' },
-            h('h4', null, t('commands')),
-            h(
-              'div',
-              { className: 'cq-list' },
-              (s.topCmds || []).map((item) =>
-                h(
-                  'div',
-                  { className: 'cq-row', key: item.key },
-                  h('span', { style: { fontFamily: 'var(--ds-font-family-code,monospace)' } }, item.key),
-                  h('span', { className: 'bar', style: { width: `${(item.value / maxCmd) * 46}px` } }),
-                  h('b', null, fmtInt(item.value)),
-                ),
-              ),
-            ),
-          ),
-        ),
-        h(
-          'div',
-          { className: 'cq-panel' },
-          h('h4', null, t('models')),
-          h(
-            'div',
-            { className: 'cq-list' },
-            (s.topModels || []).map((item) =>
-              h('div', { className: 'cq-row', key: item.key }, h('span', null, item.key), h('b', null, fmtInt(item.value))),
-            ),
-          ),
-        ),
-        h(
-          'div',
-          { className: 'cq-panel cq-prefrow' },
-          h(
-            'div',
-            { style: { minWidth: 0, flex: 1 } },
-            h('div', { style: { fontSize: '12px', fontWeight: 700 } }, t('hudShow')),
-            h('div', { className: 'cq-note' }, t('hudShowHint')),
-          ),
-          h(
-            'button',
-            {
-              className: 'cq-btn',
-              type: 'button',
-              onClick: () => writeHudMode(readHudMode() === 'hidden' ? 'pill' : 'hidden'),
-            },
-            readHudMode() === 'hidden' ? t('show') : t('hide'),
-          ),
-          h(
-            'button',
-            {
-              className: 'cq-btn',
-              type: 'button',
-              onClick: () => {
-                writeHudPos(null);
-                questStore.notify();
-              },
-            },
-            t('hudReset'),
+            { className: 'cq-rankrow', key: item.key, title: `${item.key} · ${fmtInt(item.value)}` },
+            h('span', { className: 'cq-rk' }, index + 1),
+            h('span', { className: mono ? 'cq-rn mono' : 'cq-rn' }, `${prefix || ''}${item.key}`),
+            h('span', { className: 'cq-rt' }, h('i', { style: { width: `${Math.max(2, (item.value / max) * 100)}%` } })),
+            h('b', { className: 'cq-rv' }, format ? format(item.value) : fmtInt(item.value)),
           ),
         ),
       );
     }
 
+    /** 24-hour usage as bars, with the busiest hour called out. */
+    function HourBars({ hourly, t }) {
+      const max = Math.max(1, ...hourly);
+      const peakHour = hourly.indexOf(max);
+      return h(
+        'div',
+        null,
+        h(
+          'div',
+          { className: 'cq-hourbars' },
+          hourly.map((value, hour) =>
+            h('i', {
+              key: hour,
+              className: value === max ? 'peak' : '',
+              title: `${String(hour).padStart(2, '0')}:00 · ${fmtTokens(value)}`,
+              style: { height: `${Math.max(4, (value / max) * 100)}%` },
+            }),
+          ),
+        ),
+        h(
+          'div',
+          { className: 'cq-hourfoot' },
+          h('span', null, '00'),
+          h('span', null, '06'),
+          h('span', null, '12'),
+          h('span', null, '18'),
+          h('span', { className: 'cq-hourpeak' }, `${t('peakHour')} ${String(peakHour).padStart(2, '0')}:00`),
+        ),
+      );
+    }
+
+    /** Sentiment as one stacked bar: the share of each tone at a glance. */
+    function SentimentStack({ sentiment, t }) {
+      const keys = ['praise', 'insult', 'pua', 'beg', 'blame'];
+      const colors = { praise: '#16a34a', insult: '#f97316', pua: '#8b5cf6', beg: '#0ea5e9', blame: '#ef4444' };
+      const total = keys.reduce((sum, key) => sum + (sentiment[key] || 0), 0) || 1;
+      return h(
+        'div',
+        null,
+        h(
+          'div',
+          { className: 'cq-stack' },
+          keys.map((key) =>
+            sentiment[key] > 0
+              ? h('i', {
+                  key,
+                  title: `${t(key)} ${sentiment[key]}`,
+                  style: { width: `${(sentiment[key] / total) * 100}%`, background: colors[key] },
+                })
+              : null,
+          ),
+        ),
+        h(
+          'div',
+          { className: 'cq-legend' },
+          keys.map((key) =>
+            h(
+              'span',
+              { key },
+              h('i', { style: { background: colors[key] } }),
+              t(key),
+              h('b', null, fmtInt(sentiment[key] || 0)),
+            ),
+          ),
+        ),
+      );
+    }
+
+    function DashboardTab({ data, t }) {
+      const s = data.stats;
+      const daily = Object.entries(s.dailyTokens || {})
+        .sort(([a], [b]) => (a < b ? -1 : 1))
+        .slice(-30);
+      const avg = daily.length ? daily.reduce((sum, [, value]) => sum + value, 0) / daily.length : 0;
+      const signals = (s.topSignals || []).slice(0, 18);
+      const signalsMax = signals.reduce((max, item) => Math.max(max, item.value), 0) || 1;
+      const cache = Number(s.cacheHitRate || 0) * 100;
+
+      return h(
+        'div',
+        { className: 'cq-dash' },
+        h(
+          'div',
+          { className: 'cq-kpis' },
+          h(StatTile, { label: t('totalTokens'), value: fmtTokens(s.tokens), sub: `${t('todayTokens')} ${fmtTokens(s.tokensToday)}`, tone: '#4d6bfe' }),
+          h(StatTile, { label: t('sessions'), value: fmtInt(s.sessions), sub: `${t('today')} ${fmtInt(s.sessionsToday)}`, tone: '#8b5cf6' }),
+          h(StatTile, { label: t('toolCalls'), value: fmtInt(s.toolCalls), sub: `${s.distinctTools} ${t('toolKinds')} · ${t('toolErrors')} ${fmtInt(s.toolErrors)}`, tone: '#0ea5e9' }),
+          h(StatTile, { label: t('cacheHit'), value: `${cache.toFixed(1)}%`, sub: `${fmtTokens(s.cacheRead)} ${t('cacheRead')}`, tone: '#16a34a' }),
+          h(StatTile, { label: t('streak'), value: `${s.maxStreak}`, sub: `${t('activeDays')} ${s.activeDays}`, tone: '#f59e0b' }),
+          h(StatTile, { label: t('turns'), value: fmtInt(s.turns), sub: `${fmtInt(s.humanPrompts)} ${t('prompts')}`, tone: '#ec4899' }),
+        ),
+        h(
+          'section',
+          { className: 'cq-panel' },
+          h(
+            'div',
+            { className: 'cq-panelhead' },
+            h('h4', null, t('recent')),
+            h('span', { className: 'cq-note' }, `${t('avgDay')} ${fmtTokens(avg)}`),
+          ),
+          h(TrendChart, { daily, t }),
+        ),
+        h(
+          'div',
+          { className: 'cq-grid2' },
+          h(
+            'section',
+            { className: 'cq-panel' },
+            h('div', { className: 'cq-panelhead' }, h('h4', null, t('hourly'))),
+            h(HourBars, { hourly: s.hourly || [], t }),
+          ),
+          h(
+            'section',
+            { className: 'cq-panel' },
+            h('div', { className: 'cq-panelhead' }, h('h4', null, t('sentiment'))),
+            h(SentimentStack, { sentiment: s.sentiment || {}, t }),
+            h(
+              'div',
+              { className: 'cq-mini' },
+              h('span', null, `${t('promptChars')} ${fmtInt(s.promptChars)}`),
+              h('span', null, `${t('codeBlocks')} ${fmtInt(s.codeBlocks)}`),
+            ),
+          ),
+        ),
+        h(
+          'div',
+          { className: 'cq-grid3' },
+          h(
+            'section',
+            { className: 'cq-panel' },
+            h('div', { className: 'cq-panelhead' }, h('h4', null, t('topTools'))),
+            h(RankList, { items: s.topTools || [], mono: true }),
+          ),
+          h(
+            'section',
+            { className: 'cq-panel' },
+            h('div', { className: 'cq-panelhead' }, h('h4', null, t('files'))),
+            h(RankList, { items: s.topExts || [], mono: true, prefix: '.' }),
+          ),
+          h(
+            'section',
+            { className: 'cq-panel' },
+            h('div', { className: 'cq-panelhead' }, h('h4', null, t('commands'))),
+            h(RankList, { items: s.topCmds || [], mono: true }),
+          ),
+        ),
+        h(
+          'section',
+          { className: 'cq-panel' },
+          h('div', { className: 'cq-panelhead' }, h('h4', null, t('persona'))),
+          h(
+            'div',
+            { className: 'cq-signals' },
+            signals.map((item) =>
+              h(
+                'span',
+                {
+                  key: item.key,
+                  className: 'cq-sig',
+                  style: { '--w': `${Math.max(10, Math.round((item.value / signalsMax) * 100))}%` },
+                },
+                h('em', null, SIGNAL_LABELS[item.key] || item.key),
+                h('b', null, fmtInt(item.value)),
+              ),
+            ),
+          ),
+        ),
+        h(
+          'div',
+          { className: 'cq-grid2' },
+          h(
+            'section',
+            { className: 'cq-panel' },
+            h('div', { className: 'cq-panelhead' }, h('h4', null, t('models'))),
+            h(RankList, { items: s.topModels || [] }),
+          ),
+          h(
+            'section',
+            { className: 'cq-panel' },
+            h('div', { className: 'cq-panelhead' }, h('h4', null, t('overview'))),
+            h(
+              'div',
+              { className: 'cq-mini' },
+              h('span', null, `${t('projects')} ${fmtInt(s.projects)}`),
+              h('span', null, `${t('models')} ${fmtInt(s.distinctModels)}`),
+              h('span', null, `${t('turns')} ${fmtInt(s.turns)}`),
+              h('span', null, `${t('activeDays')} ${fmtInt(s.activeDays)}`),
+            ),
+            h(
+              'div',
+              { className: 'cq-prefrow', style: { marginTop: '12px' } },
+              h(
+                'div',
+                { style: { minWidth: 0, flex: 1 } },
+                h('div', { style: { fontSize: '12px', fontWeight: 700 } }, t('hudShow')),
+                h('div', { className: 'cq-note' }, t('hudShowHint')),
+              ),
+              h(
+                'button',
+                {
+                  className: 'cq-btn',
+                  type: 'button',
+                  onClick: () => writeHudMode(readHudMode() === 'hidden' ? 'pill' : 'hidden'),
+                },
+                readHudMode() === 'hidden' ? t('show') : t('hide'),
+              ),
+              h(
+                'button',
+                {
+                  className: 'cq-btn',
+                  type: 'button',
+                  onClick: () => {
+                    writeHudPos(null);
+                    questStore.notify();
+                  },
+                },
+                t('hudReset'),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     /** Boards the server can rank. Labels come from the client dictionary. */
     const BOARDS = [
       { key: 'achievements', field: 'achievementCount' },
