@@ -125,7 +125,7 @@ mod.__store.float = null;
 // A secret goal must not leak its name or condition anywhere in the modal.
 const secretItem = payload.achievements.find((item) => item.secret);
 if (secretItem) {
-  const secretDetail = walk(views.AchievementDetail({ item: secretItem, t, onClose: () => {} }));
+  const secretDetail = walk(views.AchievementDetail({ item: secretItem, t, data: payload, onPick: () => {}, onClose: () => {} }));
   const secretText = secretDetail.text.join(' ');
   if (secretText.includes(secretItem.name)) throw new Error('secret detail leaked the name');
   if (secretText.includes(secretItem.cond)) throw new Error('secret detail leaked the condition');
@@ -134,7 +134,7 @@ if (secretItem) {
 }
 
 const unlockedItem = payload.achievements.find((item) => item.unlockedAt && item.art);
-const detail = walk(views.AchievementDetail({ item: unlockedItem, t, onClose: () => {} }));
+const detail = walk(views.AchievementDetail({ item: unlockedItem, t, data: payload, onPick: () => {}, onClose: () => {} }));
 console.log('AchievementDetail: elements=%d images=%d', detail.elements, detail.images || 0);
 if (detail.elements < 8 || !detail.images) throw new Error('detail modal did not render its art');
 

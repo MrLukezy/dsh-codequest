@@ -134,6 +134,15 @@ window.__ModuleLoader__.load({
         secret: '未揭晓',
         secretHint: '满足条件后自动揭晓',
         secretReveal: '这是一枚隐藏成就，达成时会直接弹出来告诉你',
+        secretInCat: '这个分类里还藏着 {n} 枚没揭晓',
+        secretTease: '进度到 60% 时会提前露脸，条件和还差多少一起给你看',
+        stampUnlocked: '已解锁',
+        done: '已完成',
+        progressShort: '完成度',
+        etaPrefix: '按你过去几个活跃日的平均速度，大约再',
+        etaUnit: '天',
+        nextUp: '同分类里最接近的几个',
+        allAchievements: '全部成就',
         secretCount: '还有这么多没揭晓：',
         secretUnit: '枚未揭晓',
         revealOff: '揭晓全部（剧透）',
@@ -289,6 +298,15 @@ window.__ModuleLoader__.load({
         secret: 'Undiscovered',
         secretHint: 'Unlocks itself once you meet the condition',
         secretReveal: 'A hidden achievement — it will reveal itself the moment you earn it',
+        secretInCat: '{n} still sealed in this category',
+        secretTease: 'It shows up early once you get to 60%, together with its requirement',
+        stampUnlocked: 'UNLOCKED',
+        done: 'Done',
+        progressShort: 'Progress',
+        etaPrefix: 'At your average pace, about',
+        etaUnit: 'more days',
+        nextUp: 'Closest in this category',
+        allAchievements: 'All achievements',
         secretCount: 'Still hidden:',
         secretUnit: 'undiscovered',
         revealOff: 'Reveal all (spoilers)',
@@ -605,6 +623,38 @@ function levelArtUrl(level) {
 .cq-modalvalue{font-size:12px;line-height:1.5}
 .cq-modalnote{margin-top:6px;font-size:10.5px;color:var(--dsw-alias-label-secondary,#5b6472)}
 .cq-prog.big{height:8px}
+/* --- unlock panel: ring, hero glow, next-up chain, footprint --- */
+.cq-hero{position:relative;display:flex;gap:14px;align-items:center;padding:2px 0 10px}
+.cq-heroglow{position:absolute;left:-26px;top:-30px;width:180px;height:180px;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,color-mix(in srgb,var(--cq-r) 34%,transparent),transparent 68%);filter:blur(6px);opacity:.85}
+.cq-heroartwrap{position:relative;flex:none;width:96px;height:96px}
+.cq-heroart{position:relative;width:100%;height:100%;flex:none;border-radius:26px;overflow:hidden;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 50% 34%,color-mix(in srgb,var(--cq-r) 40%,transparent),color-mix(in srgb,var(--cq-r) 8%,transparent));
+  box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--cq-r) 65%,transparent),0 10px 26px color-mix(in srgb,var(--cq-r) 30%,transparent);font-size:40px}
+.cq-heroart img{width:100%;height:100%;object-fit:cover}
+.cq-heroart.locked{filter:saturate(.25) contrast(.9);opacity:.72}
+.cq-heroart.on{animation:cqPop .34s cubic-bezier(.2,1.5,.5,1)}
+.cq-stamp{position:absolute;right:-6px;bottom:-6px;font-size:9px;font-weight:800;letter-spacing:.06em;color:#0b1220;
+  background:linear-gradient(135deg,#f7c948,#f59e0b);padding:2px 7px;border-radius:999px;box-shadow:0 3px 10px rgba(245,158,11,.45)}
+.cq-ring{position:relative;width:84px;height:84px;flex:none}
+.cq-ring svg{display:block;transform:rotate(-90deg)}
+.cq-ring .bg{stroke:color-mix(in srgb,var(--dsw-alias-border-l2,#e3e6eb) 90%,transparent)}
+.cq-ring .fg{stroke:var(--cq-r);stroke-linecap:round;transition:stroke-dashoffset .7s cubic-bezier(.3,.9,.3,1)}
+.cq-ringtext{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.cq-ringtext b{font-size:19px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.cq-ringtext span{font-size:8.5px;letter-spacing:.06em;color:var(--dsw-alias-label-secondary,#5b6472)}
+.cq-nextlist{margin-top:4px;display:flex;flex-direction:column;gap:6px}
+.cq-nextrow{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:1px solid var(--dsw-alias-border-l2,#e3e6eb);
+  background:color-mix(in srgb,var(--cq-r) 5%,transparent);border-radius:10px;padding:7px 9px;cursor:pointer;font:inherit;color:inherit;transition:.15s}
+.cq-nextrow:hover{border-color:color-mix(in srgb,var(--cq-r) 55%,transparent);transform:translateX(2px)}
+.cq-nextrow img{width:26px;height:26px;border-radius:8px;object-fit:cover;flex:none;background:rgba(120,130,150,.12)}
+.cq-nextrow .nm{flex:1;min-width:0;font-size:11.5px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cq-nextrow .pc{font-size:10.5px;font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-secondary,#5b6472)}
+.cq-footstats{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.cq-footstat{font-size:10px;color:var(--dsw-alias-label-secondary,#5b6472);border:1px solid var(--dsw-alias-border-l2,#e3e6eb);
+  border-radius:999px;padding:3px 8px;background:rgba(120,130,150,.06)}
+.cq-footstat b{color:var(--dsw-alias-label-primary,#1f2328)}
+@keyframes cqPop{0%{transform:scale(.86)}100%{transform:scale(1)}}
 .cq-dshrow{display:flex;align-items:center;gap:10px;margin-top:8px}
 .cq-dshavatar{width:38px;height:38px;border-radius:50%;object-fit:cover;flex:none;box-shadow:0 0 0 2px color-mix(in srgb,#4d6bfe 35%,transparent)}
 .cq-dshavatar.fallback{display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#4d6bfe,#a855f7);color:#fff;font-weight:800;font-size:15px}
@@ -1589,12 +1639,77 @@ function levelArtUrl(level) {
             ),
           ),
         ),
-        detail ? h(AchievementDetail, { item: detail, t, onClose: () => setDetail(null) }) : null,
+        detail
+          ? h(AchievementDetail, {
+              item: detail,
+              t,
+              data,
+              onPick: (next) => setDetail(next),
+              onClose: () => setDetail(null),
+            })
+          : null,
       );
     }
 
     /** Full-card detail: art, condition, live progress and unlock state. */
-    function AchievementDetail({ item, t, onClose }) {
+/**
+     * Per-active-day pace for a counter-style metric, so the panel can say
+     * "about 4 more days" instead of only "600 to go". Ratio-style and
+     * peak-style achievements return 0 and simply skip the estimate.
+     */
+    function dailyPace(item, stats) {
+      if (!stats) return 0;
+      const days = Math.max(1, Number(stats.activeDays) || 1);
+      const id = String(item.id || '');
+      const tool = (name) => {
+        const hit = (stats.topTools || []).find((entry) => entry.key === name);
+        return hit ? Number(hit.value) || 0 : 0;
+      };
+      if (id.startsWith('tokens_')) return (Number(stats.tokens) || 0) / days;
+      if (id.startsWith('sessions_')) return (Number(stats.sessions) || 0) / days;
+      if (id.startsWith('turns_')) return (Number(stats.turns) || 0) / days;
+      if (id.startsWith('tools_')) return (Number(stats.toolCalls) || 0) / days;
+      if (id.startsWith('writes_')) return tool('write') / days;
+      if (id.startsWith('greps_')) return tool('grep') / days;
+      if (id.startsWith('reads_')) return tool('read') / days;
+      if (id.startsWith('prompt_') || id.startsWith('chars_')) return (Number(stats.promptChars) || 0) / days;
+      if (id.startsWith('code_')) return (Number(stats.codeBlocks) || 0) / days;
+      return 0;
+    }
+
+    /** A progress ring: the number the player is chasing, made countable. */
+    function ProgressRing({ pct, label, unlocked }) {
+      const R = 34;
+      const C = 2 * Math.PI * R;
+      const filled = Math.max(0, Math.min(100, pct));
+      return h(
+        'div',
+        { className: 'cq-ring' },
+        h(
+          'svg',
+          { width: 84, height: 84, viewBox: '0 0 84 84' },
+          h('circle', { className: 'bg', cx: 42, cy: 42, r: R, fill: 'none', strokeWidth: 7 }),
+          h('circle', {
+            className: 'fg',
+            cx: 42,
+            cy: 42,
+            r: R,
+            fill: 'none',
+            strokeWidth: 7,
+            strokeDasharray: C,
+            strokeDashoffset: C * (1 - filled / 100),
+          }),
+        ),
+        h(
+          'div',
+          { className: 'cq-ringtext' },
+          h('b', null, unlocked ? '100%' : `${Math.round(filled)}%`),
+          h('span', null, label),
+        ),
+      );
+    }
+
+    function AchievementDetail({ item, t, data, onPick, onClose }) {
       useEffect(() => {
         const onKey = (event) => {
           if (event.key === 'Escape') onClose();
@@ -1607,6 +1722,24 @@ function levelArtUrl(level) {
       const secret = !item.unlockedAt && (item.secret || item.hidden);
       const pct = Math.round(item.ratio * 100);
       const remaining = Math.max(0, item.target - item.value);
+      const stats = data && data.stats;
+      const all = (data && data.achievements) || [];
+
+      // Same-category goals that are closest to popping: the pull to keep going.
+      const nextUp = all
+        .filter((entry) => entry.id !== item.id && entry.category === item.category && !entry.unlockedAt && !entry.secret && !entry.hidden)
+        .sort((a, b) => b.ratio - a.ratio)
+        .slice(0, 3);
+
+      const sameRarity = all.filter((entry) => entry.rarity === item.rarity);
+      const rarityDone = sameRarity.filter((entry) => entry.unlockedAt).length;
+      const catItems = all.filter((entry) => entry.category === item.category);
+      const catDone = catItems.filter((entry) => entry.unlockedAt).length;
+      const hiddenInCat = catItems.filter((entry) => !entry.unlockedAt && (entry.secret || entry.hidden)).length;
+
+      const pace = secret || item.unlockedAt ? 0 : dailyPace(item, stats);
+      const etaDays = pace > 0 && remaining > 0 ? Math.ceil(remaining / pace) : 0;
+      const artUrl = item.art && !secret ? `${apiBase()}/icon/${item.art}.webp` : null;
 
       return h(
         'div',
@@ -1622,13 +1755,17 @@ function levelArtUrl(level) {
           },
           h(
             'div',
-            { className: 'cq-modalhead' },
+            { className: 'cq-hero' },
+            h('div', { className: 'cq-heroglow' }),
             h(
               'div',
-              { className: 'cq-modalart' },
-              item.art && !secret
-                ? h('img', { src: `${apiBase()}/icon/${item.art}.webp`, alt: '' })
-                : h('span', null, secret ? '🔒' : item.icon),
+              { className: 'cq-heroartwrap' },
+              h(
+                'div',
+                { className: `cq-heroart${item.unlockedAt ? ' on' : ''}${secret ? ' locked' : ''}` },
+                artUrl ? h('img', { src: artUrl, alt: '' }) : h('span', null, secret ? '🔒' : item.icon),
+              ),
+              item.unlockedAt ? h('span', { className: 'cq-stamp' }, t('stampUnlocked')) : null,
             ),
             h(
               'div',
@@ -1641,42 +1778,83 @@ function levelArtUrl(level) {
                 h('span', { className: 'cq-chip' }, t(item.category)),
                 h('span', { className: 'cq-chip' }, `+${item.points} ${t('points')}`),
               ),
+              h('div', { className: 'cq-modaldesc' }, secret ? t('secretHint') : item.desc),
             ),
             h('button', { type: 'button', className: 'cq-modalx', onClick: onClose, 'aria-label': t('close') }, '✕'),
           ),
-          h('div', { className: 'cq-modaldesc' }, secret ? t('secretHint') : item.desc),
-          secret
-            ? null
-            : h(
-                'div',
-                { className: 'cq-modalsection' },
-                h('div', { className: 'cq-modallabel' }, t('condition')),
-                h('div', { className: 'cq-modalvalue' }, item.cond),
-              ),
+
           secret
             ? h(
                 'div',
                 { className: 'cq-modalsection' },
                 h('div', { className: 'cq-modalnote' }, t('secretReveal')),
+                h('div', { className: 'cq-modalnote' }, t('secretTease')),
+                hiddenInCat > 0
+                  ? h('div', { className: 'cq-modalnote' }, t('secretInCat').replace('{n}', String(hiddenInCat)))
+                  : null,
               )
             : h(
                 'div',
-                { className: 'cq-modalsection' },
+                { className: 'cq-modalsection', style: { display: 'flex', gap: '14px', alignItems: 'center' } },
+                h(ProgressRing, { pct: item.unlockedAt ? 100 : pct, label: item.unlockedAt ? t('done') : t('progressShort'), unlocked: Boolean(item.unlockedAt) }),
                 h(
                   'div',
-                  { className: 'cq-modallabel' },
-                  t('progress'),
-                  h('b', null, `${fmtInt(Math.min(item.value, item.target))} / ${fmtInt(item.target)}  (${pct}%)`),
-                ),
-                h('div', { className: 'cq-prog big' }, h('i', { style: { width: `${Math.min(100, pct)}%` } })),
-                h(
-                  'div',
-                  { className: 'cq-modalnote' },
-                  item.unlockedAt
-                    ? `${t('unlockedAt')} ${new Date(item.unlockedAt).toLocaleString()}`
-                    : `${t('remaining')} ${fmtInt(remaining)}`,
+                  { style: { minWidth: 0, flex: 1 } },
+                  h('div', { className: 'cq-modallabel' }, t('condition')),
+                  h('div', { className: 'cq-modalvalue' }, item.cond),
+                  h(
+                    'div',
+                    { className: 'cq-modalnote', style: { marginTop: '8px', fontSize: '11.5px' } },
+                    h('b', null, `${fmtInt(Math.min(item.value, item.target))} / ${fmtInt(item.target)}`),
+                    item.unlockedAt
+                      ? ` · ${new Date(item.unlockedAt).toLocaleString()}`
+                      : ` · ${t('remaining')} ${fmtInt(remaining)}`,
+                  ),
+                  etaDays > 0
+                    ? h('div', { className: 'cq-modalnote' }, `${t('etaPrefix')} ${etaDays} ${t('etaUnit')}`)
+                    : null,
                 ),
               ),
+
+          nextUp.length > 0
+            ? h(
+                'div',
+                { className: 'cq-modalsection' },
+                h('div', { className: 'cq-modallabel' }, t('nextUp')),
+                h(
+                  'div',
+                  { className: 'cq-nextlist' },
+                  nextUp.map((entry) =>
+                    h(
+                      'button',
+                      {
+                        key: entry.id,
+                        type: 'button',
+                        className: 'cq-nextrow',
+                        style: { '--cq-r': (RARITY[entry.rarity] || RARITY.common).color },
+                        onClick: () => onPick && onPick(entry),
+                      },
+                      entry.art ? h('img', { src: `${apiBase()}/icon/${entry.art}.webp`, alt: '' }) : h('span', null, entry.icon),
+                      h('span', { className: 'nm' }, entry.name),
+                      h('span', { className: 'pc' }, `${Math.round(entry.ratio * 100)}%`),
+                    ),
+                  ),
+                ),
+              )
+            : null,
+
+          h(
+            'div',
+            { className: 'cq-footstats' },
+            h('span', { className: 'cq-footstat' }, `${t(item.rarity)} `, h('b', null, `${rarityDone}/${sameRarity.length}`)),
+            h('span', { className: 'cq-footstat' }, `${t(item.category)} `, h('b', null, `${catDone}/${catItems.length}`)),
+            h(
+              'span',
+              { className: 'cq-footstat' },
+              `${t('allAchievements')} `,
+              h('b', null, `${data && data.progress ? data.progress.unlocked : 0}/${data && data.progress ? data.progress.total : all.length}`),
+            ),
+          ),
         ),
       );
     }
