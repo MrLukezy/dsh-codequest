@@ -142,6 +142,27 @@ const account = walk(views.AccountTab({ data: payload, t, reload: async () => {}
 console.log('AccountTab: elements=%d', account.elements);
 if (account.elements < 8) throw new Error('account tab rendered almost nothing');
 
+// The unlock film's end state must render the real badge, name and points.
+const film = walk(
+  views.UnlockFilm({
+    item: unlockedItem,
+    t,
+    preview: 'settle',
+    onDone: () => {},
+    onClose: () => {},
+    onOpenDetail: () => {},
+  }),
+);
+console.log('UnlockFilm: elements=%d images=%d', film.elements, film.images || 0);
+if (film.elements < 10) throw new Error('unlock film rendered almost nothing');
+if (!film.images) throw new Error('unlock film did not render the badge art');
+if (!film.text.some((line) => String(line).includes(unlockedItem.name))) {
+  throw new Error('unlock film did not print the achievement name');
+}
+if (!film.text.some((line) => String(line).includes(unlockedItem.points))) {
+  throw new Error('unlock film did not print the points');
+}
+
 // The grouped wall must show every category as its own section.
 const wall = walk(views.AchievementsTab({ data: payload, t }));
 const categories = new Set(payload.achievements.map((item) => item.category));

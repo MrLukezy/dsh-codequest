@@ -147,6 +147,12 @@ window.__ModuleLoader__.load({
         loreSub: '每解锁一段进度，就会多读到我记得的一点点。',
         loreSealed: '尚未解锁',
         loreFoot: '—— 这段文字由本机用量生成，只存在你的机器上',
+        filmUnlocked: '解锁',
+        filmPlay: '播放解锁动画',
+        filmReplay: '重播解锁动画',
+        filmSkip: '点击空白关闭',
+        filmClose: '关闭',
+        filmDetail: '看详情',
         loreToast: '新章节解锁',
         shareCard: '分享这张卡片',
         sharing: '生成链接…',
@@ -326,6 +332,12 @@ window.__ModuleLoader__.load({
         loreSub: 'Every milestone you clear reveals a little more of what I remember.',
         loreSealed: 'Still sealed',
         loreFoot: '— generated from this machine, stored only on this machine',
+        filmUnlocked: 'unlocked',
+        filmPlay: 'Play the unlock film',
+        filmReplay: 'Replay the film',
+        filmSkip: 'Click outside to close',
+        filmClose: 'Close',
+        filmDetail: 'Details',
         loreToast: 'New chapter',
         shareCard: 'Share this card',
         sharing: 'Creating link…',
@@ -724,8 +736,74 @@ function levelArtUrl(level) {
 .cq-lorebody p{margin:0 0 13px;font-size:13.5px;line-height:1.95;color:var(--dsw-alias-label-primary,#1f2328);
   font-family:"Songti SC","Noto Serif SC",Georgia,serif}
 .cq-lorebody p:last-child{margin-bottom:0}
-.cq-lorefoot{margin-top:18px;padding-top:12px;border-top:1px dashed var(--dsw-alias-border-l2,#e3e6eb);
-  font-size:10px;color:var(--dsw-alias-label-secondary,#8a93a3);letter-spacing:.04em}
+.cq-lorefoot{margin-top:18px;padding-top:12px;border-top:1px dashed var(--dsw-alias-border-l2,#e3e6eb);font-size:10px;color:var(--dsw-alias-label-secondary,#8a93a3);letter-spacing:.04em}
+
+/* --- 解锁短片 --- */
+.cq-newbadge{position:absolute;top:6px;right:6px;z-index:3;border:0;cursor:pointer;font:inherit;
+  font-size:8.5px;font-weight:900;letter-spacing:.06em;color:#fff;padding:2px 6px;border-radius:999px;
+  background:linear-gradient(135deg,#ff4d6d,#f59e0b);box-shadow:0 4px 12px rgba(255,77,109,.45),0 0 0 2px var(--dsw-alias-bg-layer-1,#fff);
+  animation:cqNewPulse 1.8s ease-in-out infinite}
+.cq-newbadge:hover{transform:scale(1.08)}
+@keyframes cqNewPulse{0%,100%{box-shadow:0 4px 12px rgba(255,77,109,.45),0 0 0 2px var(--dsw-alias-bg-layer-1,#fff)}
+  50%{box-shadow:0 4px 18px rgba(255,77,109,.75),0 0 0 2px var(--dsw-alias-bg-layer-1,#fff)}}
+
+.cq-film{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb,var(--dsw-alias-bg-layer-1,#fff) 18%,transparent);
+  backdrop-filter:blur(10px) saturate(1.04);
+  animation:cqFilmIn .25s ease-out}
+@keyframes cqFilmIn{from{opacity:0}to{opacity:1}}
+/* 不压黑整页：只把身后的界面虚化，舞台是一块透明排版区，粒子画在整屏 canvas 上。 */
+.cq-filmstage{position:relative;width:min(430px,86vw);height:min(560px,82vh);overflow:visible;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+.cq-filmcanvas{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none}
+/* 光晕和徽章同处一层，保证任何内容高度下都同心。 */
+.cq-filmcenter{position:relative;display:flex;align-items:center;justify-content:center}
+.cq-filmhalo{position:absolute;left:50%;top:50%;width:260px;height:260px;margin:-130px 0 0 -130px;border-radius:50%;
+  background:radial-gradient(circle,color-mix(in srgb,var(--cq-r) 55%,transparent),transparent 68%);
+  filter:blur(18px);opacity:0;transition:opacity .5s ease,transform .9s cubic-bezier(.2,.9,.3,1);transform:scale(.35)}
+/* 光晕先收拢再张开，徽章在它聚拢的位置成形。 */
+.cq-filmstage.p-glow .cq-filmhalo{opacity:.45;transform:scale(.4)}
+.cq-filmstage.p-burst .cq-filmhalo{opacity:.6;transform:scale(1.25)}
+.cq-filmstage.p-name .cq-filmhalo,.cq-filmstage.p-desc .cq-filmhalo,
+.cq-filmstage.p-settle .cq-filmhalo{opacity:.9;transform:scale(1)}
+.cq-filmart{position:relative;width:132px;height:132px;border-radius:34px;overflow:hidden;display:flex;
+  align-items:center;justify-content:center;font-size:52px;opacity:0;transform:scale(.32);filter:blur(12px);
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--cq-r) 70%,transparent),0 18px 50px color-mix(in srgb,var(--cq-r) 45%,transparent);
+  transition:opacity .55s ease,transform .85s cubic-bezier(.2,1.35,.35,1),filter .55s ease}
+.cq-filmart img{width:100%;height:100%;object-fit:cover}
+/* 前两个相位完全看不到图标：先散粒子，再让徽章从模糊里长出来。 */
+.cq-filmstage.p-name .cq-filmart,.cq-filmstage.p-desc .cq-filmart,
+.cq-filmstage.p-settle .cq-filmart{opacity:1;transform:scale(1);filter:blur(0)}
+.cq-filmtext{position:relative;text-align:center;padding:12px 20px;max-width:min(100%,360px);border-radius:16px;
+  background:color-mix(in srgb,var(--dsw-alias-bg-layer-1,#fff) 88%,transparent);
+  border:1px solid color-mix(in srgb,var(--cq-r) 26%,transparent);
+  box-shadow:0 14px 40px color-mix(in srgb,var(--cq-r) 18%,rgba(16,24,40,.14));
+  backdrop-filter:blur(10px);opacity:0;transform:translateY(8px);
+  transition:opacity .5s ease .05s,transform .5s ease .05s}
+.cq-filmstage.p-name .cq-filmtext,.cq-filmstage.p-desc .cq-filmtext,
+.cq-filmstage.p-settle .cq-filmtext{opacity:1;transform:none}
+.cq-filmkicker{font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;
+  color:color-mix(in srgb,var(--cq-r) 82%,#1f2328);opacity:0;transform:translateY(6px);transition:.45s ease}
+.cq-filmstage.p-name .cq-filmkicker,.cq-filmstage.p-desc .cq-filmkicker,
+.cq-filmstage.p-settle .cq-filmkicker{opacity:1;transform:none}
+.cq-filmname{margin-top:8px;font-size:24px;font-weight:800;color:var(--dsw-alias-label-primary,#1f2328);
+  letter-spacing:.01em;line-height:1.3;opacity:0;transform:translateY(10px);transition:.5s ease}
+.cq-filmstage.p-name .cq-filmname,.cq-filmstage.p-desc .cq-filmname,
+.cq-filmstage.p-settle .cq-filmname{opacity:1;transform:none}
+.cq-filmpts{margin-top:6px;font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;
+  color:color-mix(in srgb,var(--cq-r) 78%,#1f2328);opacity:0;transition:.5s ease .1s}
+.cq-filmstage.p-name .cq-filmpts,.cq-filmstage.p-desc .cq-filmpts,
+.cq-filmstage.p-settle .cq-filmpts{opacity:1}
+.cq-filmcond{margin-top:10px;font-size:11.5px;line-height:1.6;color:var(--dsw-alias-label-secondary,#5b6472);
+  opacity:0;transform:translateY(8px);transition:.5s ease}
+.cq-filmstage.p-desc .cq-filmcond,.cq-filmstage.p-settle .cq-filmcond{opacity:1;transform:none}
+.cq-filmfoot{height:40px;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.cq-filmskip{font-size:10.5px;letter-spacing:.06em;
+  color:var(--dsw-alias-label-secondary,#8a93a3);padding:5px 12px;border-radius:999px;
+  background:color-mix(in srgb,var(--dsw-alias-bg-layer-1,#fff) 82%,transparent);
+  border:1px solid var(--dsw-alias-border-l2,#e3e6eb)}
+.cq-filmactions{display:flex;gap:8px;opacity:0;animation:cqFilmIn .4s ease .1s forwards}
+.cq-filmactions .cq-btn{font-size:11.5px;padding:6px 14px;background:color-mix(in srgb,var(--dsw-alias-bg-layer-1,#fff) 92%,transparent)}
 @keyframes cqPop{0%{transform:scale(.86)}100%{transform:scale(1)}}
 .cq-dshrow{display:flex;align-items:center;gap:10px;margin-top:8px}
 .cq-dshavatar{width:38px;height:38px;border-radius:50%;object-fit:cover;flex:none;box-shadow:0 0 0 2px color-mix(in srgb,#4d6bfe 35%,transparent)}
@@ -970,7 +1048,421 @@ function levelArtUrl(level) {
       );
     }
 
-    function AchievementCard({ item, t, onOpen }) {
+/* ------------------------------------------------------------------ *
+ * 解锁短片：成就卡的「NEW!」点开后播放的一次性演出
+ * 纯 canvas + CSS，无视频文件；12 个分类各有自己的粒子形态，
+ * 4 档稀有度决定粒子数与时长。
+ * ------------------------------------------------------------------ */
+
+const FILM_SEEN_KEY = 'dsh-codequest.film-seen';
+
+function readFilmSeen() {
+  try {
+    const raw = window.localStorage.getItem(FILM_SEEN_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? new Set(parsed) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeFilmSeen(ids) {
+  try {
+    window.localStorage.setItem(FILM_SEEN_KEY, JSON.stringify([...ids]));
+  } catch {
+    /* private mode: NEW 标记下次还会在 */
+  }
+}
+
+/** 首次运行：把已解锁的都算看过，只留最近 3 枚带 NEW，免得一屏全是新。 */
+let filmSeenCache = null;
+function ensureFilmSeen(achievements) {
+  if (filmSeenCache) return filmSeenCache;
+  const stored = readFilmSeen();
+  if (stored) {
+    filmSeenCache = stored;
+    return filmSeenCache;
+  }
+  const unlocked = (achievements || [])
+    .filter((item) => item.unlockedAt)
+    .sort((a, b) => (b.unlockedAt || 0) - (a.unlockedAt || 0));
+  // 数据还没到、成就列表为空时不要落基线，否则真实数据到达后会整面墙都是 NEW。
+  if (!unlocked.length) return new Set();
+  filmSeenCache = new Set(unlocked.slice(3).map((item) => item.id));
+  writeFilmSeen(filmSeenCache);
+  return filmSeenCache;
+}
+
+function markFilmSeen(id) {
+  // 没走过墙就直接重播时，缓存还是空的：先读回已存集合，别把别人的记录冲掉。
+  if (!filmSeenCache) filmSeenCache = readFilmSeen() || new Set();
+  filmSeenCache.add(id);
+  writeFilmSeen(filmSeenCache);
+}
+
+const FILM_SPEC = {
+  common: { count: 26, dur: 3.6, spread: 0.55, size: 1 },
+  rare: { count: 52, dur: 4.2, spread: 0.75, size: 1.15 },
+  epic: { count: 84, dur: 4.8, spread: 0.95, size: 1.3 },
+  legendary: { count: 140, dur: 5.6, spread: 1.15, size: 1.5 },
+};
+
+const CODE_CHARS = '{}[]()<>/\\=+-*&|!?$#0123456789abcdef'.split('');
+
+/** One spawn recipe per category: the "shape" of that kind of work. */
+function spawnFilmParticles(category, count, w, h) {
+  const cx = w / 2;
+  const cy = h / 2;
+  const out = [];
+  for (let i = 0; i < count; i += 1) {
+    const angle = (i / count) * Math.PI * 2 + Math.random() * 0.5;
+    const speed = 0.6 + Math.random() * 2.2;
+    const base = {
+      x: cx,
+      y: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      r: 1.2 + Math.random() * 2.4,
+      life: 1,
+      decay: 0.006 + Math.random() * 0.008,
+      angle,
+      spin: (Math.random() - 0.5) * 0.2,
+      rot: Math.random() * Math.PI,
+      ch: CODE_CHARS[(Math.random() * CODE_CHARS.length) | 0],
+      phase: Math.random() * Math.PI * 2,
+      cluster: Math.random(),
+    };
+    if (category === 'token') {
+      base.vx *= 1.2;
+      base.vy = base.vy * 0.4 - 0.4;
+      base.r = 1 + Math.random() * 2;
+      base.decay = 0.005;
+    } else if (category === 'time') {
+      // 星尘：一开始就散在整个画面里，慢慢漂。
+      base.x = Math.random() * w;
+      base.y = Math.random() * h;
+      base.vx = (Math.random() - 0.5) * 0.18;
+      base.vy = (Math.random() - 0.5) * 0.18;
+      base.r = 0.8 + Math.random() * 1.6;
+      base.decay = 0.0018;
+    } else if (category === 'code') {
+      // 代码雨：从顶部整片落下来，不是从中心挤成一根柱子。
+      base.x = Math.random() * w;
+      base.y = -Math.random() * h * 0.6;
+      base.vy = 0.7 + Math.random() * 2.4;
+      base.vx = (Math.random() - 0.5) * 0.5;
+      base.r = 1 + Math.random() * 1.4;
+      base.decay = 0.0035;
+    } else if (category === 'fail') {
+      base.vx *= 2.4;
+      base.vy *= 2.4;
+      base.decay = 0.02;
+      base.r = 1;
+    } else if (category === 'easter') {
+      base.vy += 0.4;
+      base.spin = (Math.random() - 0.5) * 0.5;
+      base.r = 2 + Math.random() * 3;
+    } else if (category === 'social') {
+      base.vx *= 0.5;
+      base.vy *= 0.5;
+      base.decay = 0.0025;
+    } else if (category === 'mastery' || category === 'meta') {
+      base.vx *= 0.7;
+      base.vy *= 0.7;
+      base.decay = 0.004;
+    } else if (category === 'text' || category === 'workplace') {
+      base.vy -= 0.25;
+      base.decay = 0.004;
+    } else if (category === 'interaction') {
+      base.vx *= 1.6;
+      base.vy *= 1.6;
+      base.decay = 0.012;
+    } else if (category === 'explore') {
+      base.vx *= 1.8;
+      base.vy *= 1.8;
+      base.decay = 0.008;
+    }
+    out.push(base);
+  }
+  return out;
+}
+
+/** 12 种绘制：同一个粒子池，换一支笔。 */
+const FILM_DRAW = {
+  token(ctx, p, color) {
+    ctx.globalAlpha = p.life * 0.9;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = p.life * 0.3;
+    ctx.beginPath();
+    ctx.arc(p.x - p.vx * 4, p.y - p.vy * 4, p.r * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+  },
+  interaction(ctx, p, color) {
+    ctx.globalAlpha = p.life * 0.75;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r * 3.2, 0, Math.PI * 2);
+    ctx.stroke();
+  },
+  time(ctx, p, color) {
+    const twinkle = 0.45 + 0.55 * Math.abs(Math.sin(p.phase + p.life * 8));
+    ctx.globalAlpha = p.life * twinkle;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fill();
+  },
+  text(ctx, p, color) {
+    ctx.globalAlpha = p.life * 0.8;
+    ctx.fillStyle = color;
+    ctx.font = `${8 + p.r * 2}px ui-monospace, monospace`;
+    ctx.fillText('字', p.x, p.y);
+  },
+  workplace(ctx, p, color) {
+    ctx.globalAlpha = p.life * 0.7;
+    ctx.fillStyle = color;
+    ctx.fillRect(p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
+  },
+  code(ctx, p, color) {
+    ctx.globalAlpha = p.life * 0.85;
+    ctx.fillStyle = color;
+    ctx.font = `${8 + p.r * 3}px ui-monospace, monospace`;
+    ctx.fillText(p.ch, p.x, p.y);
+  },
+  mastery(ctx, p, color) {
+    ctx.globalAlpha = p.life * 0.8;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r * 2 + (1 - p.life) * 18, 0, Math.PI * 2);
+    ctx.stroke();
+  },
+  explore(ctx, p, color) {
+    ctx.globalAlpha = p.life * 0.9;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(p.x - p.vx * 5, p.y - p.vy * 5);
+    ctx.stroke();
+  },
+  easter(ctx, p, color) {
+    ctx.globalAlpha = p.life * 0.9;
+    ctx.fillStyle = color;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    ctx.fillRect(-p.r, -p.r * 0.5, p.r * 2, p.r);
+    ctx.restore();
+  },
+  fail(ctx, p, color) {
+    ctx.globalAlpha = p.life * 0.85;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(p.x + p.vx * 7, p.y + p.vy * 7);
+    ctx.stroke();
+  },
+  meta(ctx, p, color) {
+    ctx.globalAlpha = p.life * 0.8;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.4;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    const s = p.r * 2.4;
+    ctx.strokeRect(-s / 2, -s / 2, s, s);
+    ctx.restore();
+  },
+  social(ctx, p, color) {
+    ctx.globalAlpha = p.life * 0.75;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r * 1.4, 0, Math.PI * 2);
+    ctx.fill();
+  },
+};
+
+const FILM_PHASES = [
+  ['glow', 0],
+  ['burst', 0.12],
+  ['name', 0.34],
+  ['desc', 0.62],
+  ['settle', 0.86],
+];
+
+/**
+ * The cutscene. Click or Esc skips to the end; when it finishes it tells the
+ * wall to drop the NEW badge.
+ */
+function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
+  const canvasRef = useRef(null);
+  // preview is a test seam: the packaged renderer has no rAF, so it asks for a fixed frame.
+  const [phase, setPhase] = useState(preview || 'glow');
+  const [finished, setFinished] = useState(Boolean(preview));
+  const rarity = RARITY[item.rarity] || RARITY.common;
+  const spec = FILM_SPEC[item.rarity] || FILM_SPEC.common;
+  const artUrl = item.art ? `${apiBase()}/icon/${item.art}.webp` : null;
+
+  const doneRef = useRef(onDone);
+  useEffect(() => {
+    doneRef.current = onDone;
+  }, [onDone]);
+
+  /** 快进到结尾：标记已看，但浮层留在原地等用户选择。 */
+  const finish = useCallback(() => {
+    setPhase('settle');
+    setFinished(true);
+    if (doneRef.current) doneRef.current();
+  }, []);
+
+  /** 关闭：先补一次 finish，保证没播完就关也会写进已看记录。 */
+  const close = useCallback(() => {
+    finish();
+    if (onClose) onClose();
+  }, [finish, onClose]);
+
+  useEffect(() => {
+    const onKey = (event) => {
+      if (event.key === 'Escape') close();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [close]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || typeof canvas.getContext !== 'function') return undefined;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return undefined;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = canvas.clientWidth || 420;
+    const h = canvas.clientHeight || 300;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    ctx.scale(dpr, dpr);
+
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const particles = spawnFilmParticles(item.category, reduce ? 0 : spec.count, w, h);
+    const draw = FILM_DRAW[item.category] || FILM_DRAW.token;
+    const started = performance.now();
+    let raf = 0;
+    let lastPhase = 'glow';
+
+    const frame = (now) => {
+      const elapsed = (now - started) / 1000;
+      const progress = Math.min(1, elapsed / spec.dur);
+      const local = FILM_PHASES.filter(([, at]) => progress >= at).pop()[0];
+      if (local !== lastPhase) {
+        lastPhase = local;
+        setPhase(local);
+      }
+      ctx.clearRect(0, 0, w, h);
+      const burstAt = spec.dur * 0.12;
+      if (elapsed >= burstAt) {
+        for (const p of particles) {
+          if (p.life <= 0) continue;
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += item.category === 'easter' || item.category === 'code' ? 0.035 : 0.008;
+          p.vx *= 0.995;
+          p.rot += p.spin;
+          p.life -= p.decay;
+          draw(ctx, p, rarity.color);
+        }
+      }
+      if (progress < 1) raf = requestAnimationFrame(frame);
+      else finish();
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, [item.id, item.category, item.rarity, spec.dur, spec.count, rarity.color]);
+
+  return h(
+    'div',
+    {
+      className: 'cq-film',
+      // 点空白（含播放中）= 直接关闭；舞台内部单独拦截，避免误触。
+      onClick: close,
+      role: 'dialog',
+      'aria-modal': 'true',
+      'aria-label': item.name,
+    },
+    h(
+      'div',
+      {
+        className: `cq-filmstage p-${phase}${finished ? ' done' : ''}`,
+        style: { '--cq-r': rarity.color },
+        // 内容区只拦截冒泡：点徽章/文字不算点空白，不会误关。
+        onClick: (event) => event.stopPropagation(),
+      },
+      h('canvas', { className: 'cq-filmcanvas', ref: canvasRef }),
+      h(
+        'div',
+        { className: 'cq-filmcenter' },
+        h('div', { className: 'cq-filmhalo' }),
+        h(
+          'div',
+          { className: 'cq-filmart' },
+          artUrl ? h('img', { src: artUrl, alt: '' }) : h('span', null, item.icon || '🏆'),
+        ),
+      ),
+      h(
+        'div',
+        { className: 'cq-filmtext' },
+        h('div', { className: 'cq-filmkicker' }, `${t(item.rarity)} · ${t('filmUnlocked')}`),
+        h('div', { className: 'cq-filmname' }, item.name),
+        h('div', { className: 'cq-filmpts' }, `+${item.points}`),
+        h('div', { className: 'cq-filmcond' }, item.cond),
+      ),
+      h(
+        'div',
+        { className: 'cq-filmfoot' },
+        finished
+          ? h(
+              'div',
+              { className: 'cq-filmactions' },
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'cq-btn',
+                  onClick: (event) => {
+                    event.stopPropagation();
+                    close();
+                  },
+                },
+                t('filmClose'),
+              ),
+              onOpenDetail
+                ? h(
+                    'button',
+                    {
+                      type: 'button',
+                      className: 'cq-btn',
+                      onClick: (event) => {
+                        event.stopPropagation();
+                        onOpenDetail();
+                      },
+                    },
+                    t('filmDetail'),
+                  )
+                : null,
+            )
+          : h('div', { className: 'cq-filmskip' }, t('filmSkip')),
+      ),
+    ),
+  );
+}
+
+    function AchievementCard({ item, t, onOpen, isNew, onPlay }) {
       const rarity = RARITY[item.rarity] || RARITY.common;
       const locked = !item.unlockedAt;
       // `secret` comes from the Host: most goals stay locked-and-blank until
@@ -1019,6 +1511,22 @@ function levelArtUrl(level) {
           ),
         ),
         locked ? h('span', { className: 'cq-lock' }, '🔒') : null,
+        isNew
+          ? h(
+              'button',
+              {
+                type: 'button',
+                className: 'cq-newbadge',
+                title: t('filmPlay'),
+                'aria-label': t('filmPlay'),
+                onClick: (event) => {
+                  event.stopPropagation();
+                  if (onPlay) onPlay();
+                },
+              },
+              'NEW!',
+            )
+          : null,
         h(
           'div',
           { style: { minWidth: 0, flex: 1 } },
@@ -1564,6 +2072,9 @@ function levelArtUrl(level) {
       const [sort, setSort] = useState('default');
       // Spoiler switch: off means secret goals stay blank until they unlock.
       const [reveal, setReveal] = useState(readReveal);
+      const [film, setFilm] = useState(null);
+      // 只用来在看完短片后强制重算一次 NEW 徽标，值本身不参与渲染。
+      const [, bumpSeen] = useState(0);
 
       const needle = query.trim().toLowerCase();
 
@@ -1749,7 +2260,14 @@ function levelArtUrl(level) {
             h(
               'div',
               { className: 'cq-grid' },
-              group.items.map((item) => h(AchievementCard, { key: item.id, item, t, onOpen: () => setDetail(item) })),
+              group.items.map((item) => h(AchievementCard, {
+                key: item.id,
+                item,
+                t,
+                isNew: Boolean(item.unlockedAt) && !ensureFilmSeen(data.achievements).has(item.id),
+                onOpen: () => setDetail(item),
+                onPlay: () => setFilm(item),
+              })),
               group.secret > 0
                 ? h(
                     'button',
@@ -1778,6 +2296,27 @@ function levelArtUrl(level) {
               data,
               onPick: (next) => setDetail(next),
               onClose: () => setDetail(null),
+              onPlayFilm: () => {
+                setDetail(null);
+                setFilm(detail);
+              },
+            })
+          : null,
+        film
+          ? h(UnlockFilm, {
+              key: film.id,
+              item: film,
+              t,
+              // 已看记录写在 localStorage，bumpSeen 让当前这面墙立刻重算 NEW 徽标。
+              onDone: () => {
+                markFilmSeen(film.id);
+                bumpSeen((n) => n + 1);
+              },
+              onClose: () => setFilm(null),
+              onOpenDetail: () => {
+                setFilm(null);
+                setDetail(film);
+              },
             })
           : null,
       );
@@ -1841,7 +2380,7 @@ function levelArtUrl(level) {
       );
     }
 
-    function AchievementDetail({ item, t, data, onPick, onClose }) {
+    function AchievementDetail({ item, t, data, onPick, onClose, onPlayFilm }) {
       const [share, setShare] = useState(null);
       const [shareBusy, setShareBusy] = useState(false);
 
@@ -2034,6 +2573,13 @@ function levelArtUrl(level) {
             ),
           ),
 
+          item.unlockedAt && onPlayFilm
+            ? h(
+                'button',
+                { type: 'button', className: 'cq-btn', style: { marginTop: '10px' }, onClick: () => onPlayFilm() },
+                `🎬 ${t('filmReplay')}`,
+              )
+            : null,
           secret
             ? null
             : h(
@@ -2979,6 +3525,7 @@ function levelArtUrl(level) {
         AccountTab,
         AchievementCard,
         AchievementDetail,
+        UnlockFilm,
         QuestOverlay,
         QuestHud,
         QuestToasts,
@@ -2987,6 +3534,21 @@ function levelArtUrl(level) {
       __store: questStore,
       /** Test seam: floating-card visibility rules (they must survive a restart). */
       __hud: { readHudMode, writeHudMode, hudPref, clampHudPos },
+      /** Test seam: the unlock film's particle system and NEW-badge bookkeeping. */
+      __film: {
+        spawn: spawnFilmParticles,
+        draw: FILM_DRAW,
+        spec: FILM_SPEC,
+        seen: {
+          read: readFilmSeen,
+          write: writeFilmSeen,
+          ensure: ensureFilmSeen,
+          mark: markFilmSeen,
+          reset: () => {
+            filmSeenCache = null;
+          },
+        },
+      },
       apply(ctx) {
         let t = (key) => (DICT.zh[key] || key);
         try {
