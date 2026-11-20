@@ -426,6 +426,8 @@ export function aggregate(sessions) {
     lateNightTokens,
     sentiment: sentimentOf(prompts),
     dailyTokens,
+    dailySessions,
+    dailyPrompts,
     hourly,
     firstAt,
     lastAt,

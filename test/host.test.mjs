@@ -176,6 +176,10 @@ for (let i = 0; i < 120; i += 1) {
     console.log('promptChars:', s.promptChars, 'assistantChars:', s.assistantChars, 'codeBlocks:', s.codeBlocks);
     console.log('activeDays:', s.activeDays, 'streak:', s.maxStreak, 'cacheHit:', s.cacheHitRate);
     console.log('sentiment:', JSON.stringify(s.sentiment));
+    // 日报按天读这三张表；缺一张，那天的会话数/提问数就只能显示 0。
+    for (const key of ['dailyTokens', 'dailySessions', 'dailyPrompts']) {
+      if (!s[key] || typeof s[key] !== 'object') throw new Error(`/state stats.${key} missing for the daily report`);
+    }
     console.log('level:', p.level, 'points:', p.points, 'unlocked:', p.unlocked, '/', p.total);
     console.log('unlocked ids:', state.body.achievements.filter((a) => a.unlockedAt).map((a) => a.id).join(', '));
     await new Promise((r) => setTimeout(r, 1500));

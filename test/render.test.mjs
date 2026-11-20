@@ -80,7 +80,7 @@ function walk(node, stats = { elements: 0, text: [] }) {
   return stats;
 }
 
-for (const name of ['LevelHeader', 'AchievementsTab', 'DashboardTab']) {
+for (const name of ['LevelHeader', 'AchievementsTab', 'DailyTab', 'DashboardTab']) {
   const component = views[name];
   if (typeof component !== 'function') throw new Error(`missing view ${name}`);
   const tree = component({ data: payload, t });

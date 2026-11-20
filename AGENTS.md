@@ -41,6 +41,8 @@
 - 加成就：`achievements.js` 加一行 `a(...)`，`art.js` 补一条徽章映射；改完跑
   `node test/fold.test.mjs`、`node test/client.test.mjs`、`node test/render.test.mjs`。
 - 改折叠口径要同时 +1 `scan.js` 的 `FOLD_VERSION`。
+- 日报只读 `/state` 的 `stats.dailyTokens / dailySessions / dailyPrompts` 与成就
+  `unlockedAt`，**不要**给它单独落库或加定时写盘；切天一律走 `dayKeyOf()`（本机时区）。
 - 不要改 `server/` 的排行逻辑来「美化」自己的名次。
 
 ## 验证
@@ -51,6 +53,7 @@ node test/fold.test.mjs "$env:DSH_HOME\sessions"   # 折叠与聚合口径
 node test/client.test.mjs                          # 模块加载 + slot 注册
 node test/overlay.test.mjs                         # 浮层文案兜底 + ▣ 打开整页
 node test/hud.test.mjs                             # 细条/胶囊/展开 + 工作指示灯
+node test/daily.test.mjs                           # 日报：切天 / 7 天对照 / 一天只提醒一次
 node test/render.test.mjs <payload.json>           # 用真实 /state 跑渲染
 node test/server.test.mjs                          # 服务端多端汇总（临时 SQLite，不碰线上库）
 node test/cloud.test.mjs                           # 插件 → 服务端的设备字段

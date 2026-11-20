@@ -448,6 +448,9 @@ export function apply(ctx) {
         topFences: topEntries(metrics.assistant.fences, 10),
         sentiment: metrics.sentiment,
         dailyTokens: trimDaily(metrics.dailyTokens),
+        // 日报按天读这三张表：token / 会话数 / 提问数。
+        dailySessions: trimDaily(metrics.dailySessions),
+        dailyPrompts: trimDaily(metrics.dailyPrompts),
         hourly: metrics.hourly,
         topTools: topEntries(metrics.tools, 12),
         topModels: topEntries(metrics.models, 6),

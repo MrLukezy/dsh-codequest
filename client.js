@@ -231,6 +231,33 @@ window.__ModuleLoader__.load({
         overview: '概览',        peakDay: '峰值',
         peakHour: '高峰',
         avgDay: '日均',
+        // ── 日报：第二天打开 / 挂机到 0 点时总结前一天 ──
+        daily: '日报',
+        dailyTitle: '昨日日报',
+        dailySub: '每天 0 点结算前一天；第二天打开页面时也会自动补上。',
+        dailyYesterday: '昨天',
+        dailyToday: '今天',
+        dailyPrev: '前一天',
+        dailyNext: '后一天',
+        dailyTokens: 'Token',
+        dailySessions: '会话',
+        dailyPrompts: '提问',
+        dailyUnlocks: '解锁成就',
+        dailyNoUnlocks: '没有新成就，下一枚还在路上',
+        dailyPoints: '积分',
+        dailyVsAvg: '较前 7 天均值',
+        dailyAvg: '前 7 天日均',
+        dailyStreak: '连续 {n} 天有产出',
+        dailyQuiet: '这天没有记录到活动，休息也算一种进度',
+        dailyEmpty: '这一天还没有数据',
+        dailyHeadlineBest: '近 7 天里最猛的一天',
+        dailyHeadlineUp: '比前 7 天均值高 {n}%',
+        dailyHeadlineDown: '比前 7 天均值低 {n}%',
+        dailyHeadlineSteady: '跟前 7 天差不多',
+        dailyWeek: '近 7 天',
+        dailyToast: '昨日日报已生成',
+        dailyToastHint: '点一下看昨天干了什么',
+        dailyOpen: '查看日报',
         cacheRead: '缓存读取',
         promptChars: '输入字数',
         codeBlocks: '代码块',
@@ -455,6 +482,33 @@ window.__ModuleLoader__.load({
         overview: 'Overview',        peakDay: 'Peak',
         peakHour: 'Peak',
         avgDay: 'Daily avg',
+        // ── Daily report: settles at midnight, catches up on the next open ──
+        daily: 'Daily',
+        dailyTitle: 'Yesterday in review',
+        dailySub: 'Settles at local midnight; opening the page the next day catches up.',
+        dailyYesterday: 'Yesterday',
+        dailyToday: 'Today',
+        dailyPrev: 'Previous day',
+        dailyNext: 'Next day',
+        dailyTokens: 'Tokens',
+        dailySessions: 'Sessions',
+        dailyPrompts: 'Prompts',
+        dailyUnlocks: 'Achievements unlocked',
+        dailyNoUnlocks: 'No new achievements — the next one is on its way',
+        dailyPoints: 'points',
+        dailyVsAvg: 'vs previous 7-day average',
+        dailyAvg: '7-day average',
+        dailyStreak: '{n} days in a row',
+        dailyQuiet: 'No activity recorded — rest counts as progress too',
+        dailyEmpty: 'No data for this day yet',
+        dailyHeadlineBest: 'Your strongest day in the last 7',
+        dailyHeadlineUp: '{n}% above the previous 7-day average',
+        dailyHeadlineDown: '{n}% below the previous 7-day average',
+        dailyHeadlineSteady: 'About the same as the previous 7 days',
+        dailyWeek: 'Last 7 days',
+        dailyToast: 'Yesterday in review is ready',
+        dailyToastHint: 'Click to see what yesterday looked like',
+        dailyOpen: 'Open daily report',
         cacheRead: 'cache read',
         promptChars: 'Prompt chars',
         codeBlocks: 'Code blocks',
@@ -599,6 +653,105 @@ function levelArtUrl(level) {
       return t('agoDays').replace('{n}', String(Math.round(hours / 24)));
     }
 
+    /** 本地日期键（YYYY-MM-DD）：日报按本机时区切天，不跟 UTC 走。 */
+    function dayKeyOf(ms) {
+      const d = new Date(Number(ms) || Date.now());
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+
+    /** 在本地日期键上加减天数，跨月跨年交给 Date 处理。 */
+    function shiftDayKey(key, delta) {
+      const parts = String(key || '').split('-').map((part) => Number(part));
+      if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) return dayKeyOf(Date.now());
+      const next = new Date(parts[0], parts[1] - 1, parts[2] + (Number(delta) || 0));
+      return dayKeyOf(next.getTime());
+    }
+
+    const DAILY_SEEN_KEY = 'dsh-codequest.daily-seen';
+
+    function readDailySeen() {
+      try {
+        return window.localStorage.getItem(DAILY_SEEN_KEY);
+      } catch {
+        return null;
+      }
+    }
+
+    function writeDailySeen(key) {
+      try {
+        window.localStorage.setItem(DAILY_SEEN_KEY, String(key));
+      } catch {
+        /* private mode: the digest may replay after a reload */
+      }
+    }
+
+    /**
+     * 某一天的总结。只读 `/state` 里已有的日维度数据（token / 会话 / 提问）
+     * 和成就的解锁时间，所以同一天反复算出来的结果一致，不需要把日报落库。
+     */
+    function buildDailyReport(data, dateKey) {
+      const stats = (data && data.stats) || {};
+      const tokensMap = stats.dailyTokens || {};
+      const sessionsMap = stats.dailySessions || {};
+      const promptsMap = stats.dailyPrompts || {};
+      const tokens = Number(tokensMap[dateKey]) || 0;
+      const sessions = Number(sessionsMap[dateKey]) || 0;
+      const prompts = Number(promptsMap[dateKey]) || 0;
+      // 老 Host 还没下发这两张表时，页面显示「—」而不是假的 0。
+      const sessionsKnown = Boolean(stats.dailySessions);
+      const promptsKnown = Boolean(stats.dailyPrompts);
+      const unlocks = ((data && data.achievements) || [])
+        .filter((item) => item && item.unlockedAt && dayKeyOf(item.unlockedAt) === dateKey)
+        .sort((a, b) => Number(a.unlockedAt) - Number(b.unlockedAt));
+      const points = unlocks.reduce((sum, item) => sum + (Number(item.points) || 0), 0);
+
+      // 前 7 天（不含当天）的 token 均值，用来给当天一个「多还是少」的参照。
+      const previous = [];
+      for (let i = 7; i >= 1; i -= 1) previous.push(Number(tokensMap[shiftDayKey(dateKey, -i)]) || 0);
+      const avg = previous.reduce((sum, value) => sum + value, 0) / previous.length;
+      const deltaPct = avg > 0 ? Math.round(((tokens - avg) / avg) * 100) : null;
+      const best = tokens > 0 && previous.every((value) => tokens >= value);
+
+      // 连续有产出的天数：从当天往前数，遇到空白的一天就停。
+      let streak = 0;
+      for (let i = 0; i < 120; i += 1) {
+        if ((Number(tokensMap[shiftDayKey(dateKey, -i)]) || 0) > 0) streak += 1;
+        else break;
+      }
+
+      const week = [];
+      for (let i = 6; i >= 0; i -= 1) {
+        const key = shiftDayKey(dateKey, -i);
+        week.push({ key, tokens: Number(tokensMap[key]) || 0 });
+      }
+
+      return {
+        dateKey,
+        tokens,
+        sessions,
+        prompts,
+        sessionsKnown,
+        promptsKnown,
+        unlocks,
+        points,
+        avg,
+        deltaPct,
+        best,
+        streak,
+        week,
+        active: tokens > 0 || sessions > 0 || prompts > 0 || unlocks.length > 0,
+      };
+    }
+
+    /** 第二天打开、或挂机跨过 0 点时，该不该弹「昨日日报」。 */
+    function pendingDailyDigest(data, nowMs, seenKey) {
+      const yesterday = shiftDayKey(dayKeyOf(nowMs), -1);
+      if (!data || seenKey === yesterday) return null;
+      const report = buildDailyReport(data, yesterday);
+      return report.active ? report : null;
+    }
+
     const styles = `
 /* 独立整页：作为 main 面板渲染时撑满中间列，顶部留一条返回对话的条。 */
 .cq-page{display:flex;flex-direction:column;height:100%;min-height:0}
@@ -696,6 +849,34 @@ function levelArtUrl(level) {
 .cq-overlay>*{pointer-events:auto}
 .cq-hud{display:flex;flex-direction:column;align-items:flex-end}
 .cq-dash{display:flex;flex-direction:column;gap:12px}
+/* ── 日报：昨天的总结 + 近 7 天对照 ── */
+.cq-daily{display:flex;flex-direction:column;gap:12px}
+.cq-dailyhead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.cq-dailyday{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.cq-dailyday b{font-size:15px;font-weight:800}
+.cq-dailyday span{font-size:11.5px;color:var(--dsw-alias-label-secondary,#5b6472)}
+.cq-dailynav{display:flex;align-items:center;gap:5px}
+.cq-dailynav button{border:1px solid var(--dsw-alias-border-l2,#e3e6eb);background:var(--dsw-alias-bg-layer-1,#fff);color:var(--dsw-alias-label-secondary,#5b6472);border-radius:8px;width:26px;height:24px;line-height:1;font:inherit;font-size:12px;cursor:pointer}
+.cq-dailynav button:disabled{opacity:.4;cursor:default}
+.cq-dailynav span{font-size:11px;color:var(--dsw-alias-label-secondary,#5b6472);min-width:64px;text-align:center}
+.cq-dailyweek{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;align-items:stretch;height:86px;margin-top:12px}
+.cq-dailycol{display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;min-height:0}
+.cq-dailybar{flex:1;width:100%;display:flex;align-items:flex-end;min-height:0}
+.cq-dailybar i{display:block;width:100%;min-height:3px;border-radius:4px 4px 1px 1px;background:linear-gradient(180deg,color-mix(in srgb,#4d6bfe 62%,transparent),color-mix(in srgb,#8b5cf6 34%,transparent))}
+.cq-dailycol.on .cq-dailybar i{background:linear-gradient(180deg,#a855f7,#4d6bfe)}
+.cq-dailycol span{font-size:9.5px;color:var(--dsw-alias-label-secondary,#5b6472);font-variant-numeric:tabular-nums}
+.cq-dailycol.on span{color:#a855f7;font-weight:700}
+.cq-dailyfoot{display:flex;justify-content:space-between;gap:8px;margin-top:6px;font-size:10.5px;color:var(--dsw-alias-label-secondary,#5b6472)}
+.cq-dailydelta{font-size:10.5px;font-weight:700}
+.cq-dailydelta.up{color:#16a34a}
+.cq-dailydelta.down{color:#dc2626}
+.cq-unlocklist{display:flex;flex-direction:column}
+.cq-unlockrow{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px dashed var(--dsw-alias-border-l2,#e3e6eb);font-size:12px}
+.cq-unlockrow:last-child{border-bottom:0}
+.cq-unlockrow img{width:26px;height:26px;border-radius:50%;object-fit:cover;flex:none;background:color-mix(in srgb,#4d6bfe 12%,transparent)}
+.cq-unlockrow em{font-style:normal;color:#a855f7;font-weight:700;font-size:10.5px;font-variant-numeric:tabular-nums}
+.cq-unlockrow small{margin-left:auto;color:var(--dsw-alias-label-secondary,#5b6472);font-size:10.5px;white-space:nowrap}
+.cq-dailyempty{padding:14px 0;text-align:center;color:var(--dsw-alias-label-secondary,#5b6472);font-size:11.5px}
 .cq-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 @media (min-width:880px){.cq-kpis{grid-template-columns:repeat(6,minmax(0,1fr))}}
 .cq-kpi{position:relative;overflow:hidden;border:1px solid var(--dsw-alias-border-l2,#e3e6eb);border-radius:14px;padding:11px 13px 10px;background:linear-gradient(150deg,color-mix(in srgb,var(--cq-k,#4d6bfe) 10%,var(--dsw-alias-bg-layer-1,#fff)),var(--dsw-alias-bg-layer-1,#fff) 62%)}
@@ -818,6 +999,8 @@ html.cq-has-bar #root{padding-bottom:var(--cq-bar-h,40px);box-sizing:border-box}
 .cq-toasttitle{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#4d6bfe}
 .cq-toastname{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:650;color:var(--dsw-alias-label-primary,#1f2328)}
 .cq-toastname b{font-size:10.5px;color:#a855f7;font-variant-numeric:tabular-nums}
+.cq-dailydigest{border-color:color-mix(in srgb,#a855f7 38%,transparent)}
+.cq-dailydigest .cq-toasttitle{color:#a855f7}
 .cq-modal{position:fixed;inset:0;z-index:80;background:rgba(16,20,32,.42);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;padding:24px}
 .cq-modalbox{width:min(420px,100%);max-height:82vh;overflow:auto;border-radius:16px;border:1px solid color-mix(in srgb,var(--cq-r) 45%,transparent);background:linear-gradient(160deg,color-mix(in srgb,var(--cq-r) 12%,var(--dsw-alias-bg-layer-1,#fff)),var(--dsw-alias-bg-layer-1,#fff) 55%);box-shadow:0 24px 60px rgba(12,16,28,.35);padding:16px 17px 18px}
 .cq-modalhead{display:flex;align-items:flex-start;gap:12px}
@@ -1049,6 +1232,8 @@ html.cq-has-bar #root{padding-bottom:var(--cq-bar-h,40px);box-sizing:border-box}
  */
     const questStore = {
       data: null,
+      /** 这份快照是什么时候拿到的：跨 0 点的日报要等刷新后才结算。 */
+      dataAt: 0,
       error: null,
       /** Cheap /live snapshot: drives the HUD between full /state refreshes. */
       live: null,
@@ -1067,6 +1252,7 @@ html.cq-has-bar #root{padding-bottom:var(--cq-bar-h,40px);box-sizing:border-box}
             const next = await api('/state');
             if (next && next.ok) {
               this.data = next;
+              this.dataAt = Date.now();
               this.error = null;
             } else {
               this.error = (next && next.error) || 'state_failed';
@@ -1893,6 +2079,27 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
     /** Set by `apply()`: the floating layer has no handle on the layout service. */
     let openQuestPage = null;
 
+    /**
+     * 浮层入口想直接落到某个页签（比如日报气泡 → 日报页）。
+     * 页面没挂载时先存着，挂载后 `takeRequestedTab()` 取走；已挂载时用事件通知。
+     */
+    let requestedTab = null;
+
+    function requestTab(tab) {
+      requestedTab = tab || null;
+      try {
+        window.dispatchEvent(new CustomEvent('dsh-codequest:tab', { detail: requestedTab }));
+      } catch {
+        /* 页面还没挂载或环境不支持事件：挂载时读 requestedTab 就够了 */
+      }
+    }
+
+    function takeRequestedTab() {
+      const tab = requestedTab;
+      requestedTab = null;
+      return tab;
+    }
+
     /** Persisted default from the Host (`prefs.hud`): `bar` | `pill` | `open` | `off`. */
     function hudPref() {
       const prefs = questStore.data && questStore.data.prefs;
@@ -2483,6 +2690,67 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
       );
     }
 
+    /**
+     * 昨日日报提示：第二天打开页面、或挂机跨过 0 点时弹一次。
+     * 已弹过的日期记在 localStorage，同一天刷新不会重复打扰。
+     */
+    function DailyDigest({ t }) {
+      const { data } = useQuestStore();
+      const [report, setReport] = useState(null);
+      const [tick, setTick] = useState(0);
+
+      // 跨 0 点时页面通常一直开着：低频心跳重新判断「昨天」是哪一天。
+      useEffect(() => {
+        const timer = window.setInterval(() => setTick((n) => n + 1), 30_000);
+        return () => window.clearInterval(timer);
+      }, []);
+
+      useEffect(() => {
+        if (!data) return;
+        // 跨 0 点时先等一份「0 点之后」的快照，避免拿 23:59 的数据结算昨天。
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        if (questStore.dataAt < todayStart.getTime()) return;
+        const next = pendingDailyDigest(data, Date.now(), readDailySeen());
+        if (!next) return;
+        writeDailySeen(next.dateKey);
+        setReport(next);
+      }, [data, tick]);
+
+      useEffect(() => {
+        if (!report) return undefined;
+        const timer = window.setTimeout(() => setReport(null), 20_000);
+        return () => window.clearTimeout(timer);
+      }, [report]);
+
+      if (!report) return null;
+      return h(
+        'button',
+        {
+          type: 'button',
+          className: 'cq-toast cq-dailydigest',
+          title: t('dailyToastHint'),
+          onClick: () => {
+            if (openQuestPage) openQuestPage('daily');
+            setReport(null);
+          },
+        },
+        h('div', { className: 'cq-toasticon' }, h('span', null, '📊')),
+        h(
+          'div',
+          { style: { minWidth: 0, flex: 1, textAlign: 'left' } },
+          h('div', { className: 'cq-toasttitle' }, t('dailyToast')),
+          h(
+            'div',
+            { className: 'cq-toastname' },
+            `${fmtTokens(report.tokens)} ${t('dailyTokens')}${
+              report.sessionsKnown ? ` · ${report.sessions} ${t('dailySessions')}` : ''
+            }`,
+          ),
+        ),
+      );
+    }
+
     /** One overlay column: unlock toasts on top, the usage HUD below. */
     function QuestOverlay(props) {
       const t = (props && props.t) || pluginT;
@@ -2490,6 +2758,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
       return h(
         'div',
         { className: 'cq-overlay' },
+        h(DailyDigest, { t }),
         h(QuestToasts, { t }),
         h(QuestHud, { t }),
       );
@@ -3337,6 +3606,151 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
               : null,
             h('button', { className: 'cq-btn', type: 'button', onClick: onClose }, final ? t('close') : t('crackClose')),
           ),
+        ),
+      );
+    }
+
+    /** 日期/时间的本地化文案；Intl 不可用时退回原始日期键。 */
+    function fmtDayLabel(dateKey, locale, opts) {
+      const parts = String(dateKey || '').split('-').map((part) => Number(part));
+      if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) return String(dateKey || '');
+      const date = new Date(parts[0], parts[1] - 1, parts[2]);
+      try {
+        return new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'zh-CN', opts).format(date);
+      } catch {
+        return String(dateKey);
+      }
+    }
+
+    function fmtClock(ms, locale) {
+      try {
+        return new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'zh-CN', { hour: '2-digit', minute: '2-digit' }).format(
+          new Date(Number(ms)),
+        );
+      } catch {
+        return '';
+      }
+    }
+
+    /**
+     * 日报页签：默认展示昨天（最近一个完整的一天），可以往前翻。
+     * 数据全部来自 `/state` 已有的日维度字段，不额外请求，也不会因为刷新丢一天。
+     */
+    function DailyTab({ data, t, locale }) {
+      const yesterday = shiftDayKey(dayKeyOf(Date.now()), -1);
+      const [dayKey, setDayKey] = useState(yesterday);
+      const report = buildDailyReport(data, dayKey);
+      const isYesterday = dayKey === yesterday;
+      const maxWeek = Math.max(1, ...report.week.map((item) => item.tokens));
+      const delta = report.deltaPct;
+      const headline = !report.active
+        ? t('dailyQuiet')
+        : report.best
+          ? t('dailyHeadlineBest')
+          : delta !== null && delta >= 15
+            ? t('dailyHeadlineUp').replace('{n}', String(delta))
+            : delta !== null && delta <= -15
+              ? t('dailyHeadlineDown').replace('{n}', String(Math.abs(delta)))
+              : t('dailyHeadlineSteady');
+      const deltaText = delta === null ? '' : `${delta >= 0 ? '+' : ''}${delta}%`;
+
+      return h(
+        'div',
+        { className: 'cq-daily' },
+        h(
+          'section',
+          { className: 'cq-panel' },
+          h(
+            'div',
+            { className: 'cq-dailyhead' },
+            h(
+              'div',
+              { className: 'cq-dailyday' },
+              h('b', null, fmtDayLabel(dayKey, locale, { month: 'long', day: 'numeric', weekday: 'long' })),
+              isYesterday ? h('span', null, t('dailyYesterday')) : null,
+              h('span', { className: 'cq-note' }, headline),
+            ),
+            h(
+              'div',
+              { className: 'cq-dailynav' },
+              h(
+                'button',
+                { type: 'button', title: t('dailyPrev'), onClick: () => setDayKey(shiftDayKey(dayKey, -1)) },
+                '‹',
+              ),
+              h('span', null, isYesterday ? t('dailyYesterday') : dayKey),
+              h(
+                'button',
+                { type: 'button', title: t('dailyNext'), disabled: isYesterday, onClick: () => setDayKey(shiftDayKey(dayKey, 1)) },
+                '›',
+              ),
+            ),
+          ),
+          h(
+            'div',
+            { className: 'cq-kpis' },
+            h(StatTile, {
+              label: t('dailyTokens'),
+              value: fmtTokens(report.tokens),
+              sub: deltaText ? `${t('dailyVsAvg')} ${deltaText}` : t('dailyAvg'),
+              tone: '#4d6bfe',
+            }),
+            h(StatTile, { label: t('dailySessions'), value: report.sessionsKnown ? fmtInt(report.sessions) : '—', sub: t('dailySessions'), tone: '#8b5cf6' }),
+            h(StatTile, { label: t('dailyPrompts'), value: report.promptsKnown ? fmtInt(report.prompts) : '—', sub: t('dailyPrompts'), tone: '#0ea5e9' }),
+          ),
+          h(
+            'div',
+            { className: 'cq-dailyweek', title: t('dailyWeek') },
+            report.week.map((item) =>
+              h(
+                'div',
+                { key: item.key, className: `cq-dailycol${item.key === dayKey ? ' on' : ''}` },
+                h(
+                  'div',
+                  { className: 'cq-dailybar' },
+                  h('i', {
+                    style: { height: `${Math.max(4, Math.round((item.tokens / maxWeek) * 100))}%` },
+                    title: `${item.key} · ${fmtTokens(item.tokens)}`,
+                  }),
+                ),
+                h('span', null, fmtDayLabel(item.key, locale, { weekday: 'short' })),
+              ),
+            ),
+          ),
+          h(
+            'div',
+            { className: 'cq-dailyfoot' },
+            h('span', null, `${t('dailyAvg')} ${fmtTokens(report.avg)}`),
+            report.streak > 1 ? h('span', null, t('dailyStreak').replace('{n}', String(report.streak))) : null,
+          ),
+        ),
+        h(
+          'section',
+          { className: 'cq-panel' },
+          h(
+            'div',
+            { className: 'cq-panelhead' },
+            h('h4', null, t('dailyUnlocks')),
+            report.points > 0 ? h('span', { className: 'cq-note' }, `+${report.points} ${t('dailyPoints')}`) : null,
+          ),
+          report.unlocks.length === 0
+            ? h('div', { className: 'cq-dailyempty' }, report.active ? t('dailyNoUnlocks') : t('dailyEmpty'))
+            : h(
+                'div',
+                { className: 'cq-unlocklist' },
+                report.unlocks.map((item) =>
+                  h(
+                    'div',
+                    { key: item.id, className: 'cq-unlockrow' },
+                    item.art
+                      ? h('img', { src: `${apiBase()}/icon/${item.art}.webp`, alt: '' })
+                      : h('span', null, item.icon || '🏆'),
+                    h('b', null, item.name),
+                    h('em', null, `+${item.points}`),
+                    h('small', null, fmtClock(item.unlockedAt, locale)),
+                  ),
+                ),
+              ),
         ),
       );
     }
@@ -4211,6 +4625,19 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
         setLocale(lang.startsWith('en') ? 'en' : 'zh');
       }, []);
 
+      // 浮层里的入口（日报气泡）可以指定落到哪个页签；挂载前点的那次在
+      // requestedTab 里等着，这里取走，挂载后的用事件通知。
+      useEffect(() => {
+        const wanted = takeRequestedTab();
+        if (wanted) setTab(wanted);
+        const onTab = (event) => {
+          const next = event && event.detail;
+          if (typeof next === 'string' && next) setTab(next);
+        };
+        window.addEventListener('dsh-codequest:tab', onTab);
+        return () => window.removeEventListener('dsh-codequest:tab', onTab);
+      }, []);
+
       const dict = DICT[locale] || DICT.zh;
       const t = useCallback((key) => dict[key] || key, [dict]);
 
@@ -4223,6 +4650,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
 
       const tabs = [
         ['achievements', t('achievements')],
+        ['daily', t('daily')],
         ['lore', t('lore')],
         ['dashboard', t('dashboard')],
         ['leaderboard', t('leaderboard')],
@@ -4264,6 +4692,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
           ),
         ),
         tab === 'achievements' ? h(AchievementsTab, { data, t }) : null,
+        tab === 'daily' ? h(DailyTab, { data, t, locale }) : null,
         tab === 'lore' ? h(LoreTab, { data, t }) : null,
         tab === 'dashboard' ? h(DashboardTab, { data, t, reload }) : null,
         tab === 'leaderboard' ? h(LeaderboardTab, { t, data }) : null,
@@ -4279,6 +4708,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
         CodeQuestView,
         LevelHeader,
         AchievementsTab,
+        DailyTab,
         LoreTab,
         LoreReader,
         DashboardTab,
@@ -4295,9 +4725,19 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
         QuestHud,
         QuestToasts,
         QuestToast,
+        DailyDigest,
       },
       /** Test seam: lets the packaged render test seed a snapshot. */
       __store: questStore,
+      /** Test seam: 日报的纯计算逻辑（同一天算多次结果一致）。 */
+      __daily: {
+        build: buildDailyReport,
+        pending: pendingDailyDigest,
+        dayKeyOf,
+        shiftDayKey,
+        readSeen: readDailySeen,
+        writeSeen: writeDailySeen,
+      },
       /** Test seam: overlay copy must survive a half-registered locale service. */
       __i18n: {
         builtin: builtinT,
@@ -4363,7 +4803,10 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
           }
         };
         // 浮层里的入口靠这个回到整页，不用把 layout 服务透传进 overlay。
-        openQuestPage = () => selectPanel(PANEL_ID);
+        openQuestPage = (tab) => {
+          if (tab) requestTab(tab);
+          selectPanel(PANEL_ID);
+        };
 
         // 独立整页：作为 `main` 面板注册，和「插件」「日程」同级，不再占用会话标签栏。
         ctx.slots.inject('main', () =>
