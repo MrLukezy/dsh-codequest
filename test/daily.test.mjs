@@ -107,6 +107,9 @@ assert(report.week[6].key === yesterday && report.week[6].tokens === 3000, 'week
 assert(report.weekTotal === 8000, `week total ${report.weekTotal}`);
 assert(report.rank30 === 1 && report.rankedDays === 6, `rank ${report.rank30}/${report.rankedDays}`);
 assert(report.monthTokens === 8000, `month total ${report.monthTokens}`);
+assert(report.monthDays.length === 30, `strip length ${report.monthDays.length}`);
+assert(report.monthDays[29].key === yesterday && report.monthDays[29].tokens === 3000, 'strip ends on the day');
+assert(report.monthTotal === 8000, `30-day total ${report.monthTotal}`);
 assert(report.sameWeekday === 0, `same weekday last week ${report.sameWeekday}`);
 assert(report.active === true, 'active day');
 
@@ -179,7 +182,11 @@ assert(typeof views.DailyDigest === 'function', 'missing DailyDigest');
 const tree = views.DailyTab({ data, t: (key) => key, locale: 'zh' });
 const walked = walk(tree);
 assert(walked.classes.some((name) => name.includes('cq-dailyhero')), 'daily tab must render the hero');
-assert(walked.classes.some((name) => name.includes('cq-dailycol')), 'daily tab must render the 7-day bars');
+assert(
+  walked.classes.filter((name) => /^cq-dailycol( on)?$/.test(name)).length === 30,
+  'daily tab must render the 30-day strip',
+);
+assert(walked.classes.some((name) => name === 'cq-dailyweek'), 'strip must be the horizontal scroller');
 assert(walked.texts.includes('3000') || walked.texts.includes('3.0K'), 'daily tab must show the token total');
 assert(walked.texts.filter((text) => text === '+20' || text === '+40').length === 2, 'unlock rows');
 

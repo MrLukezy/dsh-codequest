@@ -240,7 +240,6 @@ window.__ModuleLoader__.load({
         dailyNoUnlocks: '没有新成就，下一枚还在路上',
         dailyPoints: '积分',
         dailyVsAvg: '较前 7 天均值',
-        dailyAvg: '前 7 天日均',
         dailyStreak: '连续 {n} 天有产出',
         dailyQuiet: '这天没有记录到活动，休息也算一种进度',
         dailyEmpty: '这一天还没有数据',
@@ -248,8 +247,9 @@ window.__ModuleLoader__.load({
         dailyHeadlineUp: '比前 7 天均值高 {n}%',
         dailyHeadlineDown: '比前 7 天均值低 {n}%',
         dailyHeadlineSteady: '跟前 7 天差不多',
-        dailyWeek: '近 7 天',
-        dailyWeekTotal: '近 7 天合计',
+        dailyTrend: '近 30 天',
+        dailyTrendTotal: '近 30 天合计',
+        dailyAvgDay: '日均',
         dailyFacts: '这一天的位置',
         dailyRank30: '近 30 天排名',
         dailyMonth: '本月累计',
@@ -493,7 +493,6 @@ window.__ModuleLoader__.load({
         dailyNoUnlocks: 'No new achievements — the next one is on its way',
         dailyPoints: 'points',
         dailyVsAvg: 'vs previous 7-day average',
-        dailyAvg: '7-day average',
         dailyStreak: '{n} days in a row',
         dailyQuiet: 'No activity recorded — rest counts as progress too',
         dailyEmpty: 'No data for this day yet',
@@ -501,8 +500,9 @@ window.__ModuleLoader__.load({
         dailyHeadlineUp: '{n}% above the previous 7-day average',
         dailyHeadlineDown: '{n}% below the previous 7-day average',
         dailyHeadlineSteady: 'About the same as the previous 7 days',
-        dailyWeek: 'Last 7 days',
-        dailyWeekTotal: '7-day total',
+        dailyTrend: 'Last 30 days',
+        dailyTrendTotal: '30-day total',
+        dailyAvgDay: 'Daily average',
         dailyFacts: 'Where it stands',
         dailyRank30: 'Rank in last 30 days',
         dailyMonth: 'This month',
@@ -736,11 +736,20 @@ function levelArtUrl(level) {
       }
       const weekTotal = week.reduce((sum, item) => sum + item.tokens, 0);
 
-      // 近 30 天里这一天排第几（只算有产出的天），以及本月累计与上周同一天。
-      const last30 = [];
-      for (let i = 29; i >= 0; i -= 1) last30.push(Number(tokensMap[shiftDayKey(dateKey, -i)]) || 0);
-      const ranked = last30.filter((value) => value > 0);
+      // 近 30 天：横滑条、走势折线、排名都用这一份。
+      const monthDays = [];
+      for (let i = 29; i >= 0; i -= 1) {
+        const key = shiftDayKey(dateKey, -i);
+        monthDays.push({
+          key,
+          tokens: Number(tokensMap[key]) || 0,
+          sessions: Number(sessionsMap[key]) || 0,
+          prompts: Number(promptsMap[key]) || 0,
+        });
+      }
+      const ranked = monthDays.map((item) => item.tokens).filter((value) => value > 0);
       const rank30 = tokens > 0 ? ranked.filter((value) => value > tokens).length + 1 : 0;
+      const monthTotal = monthDays.reduce((sum, item) => sum + item.tokens, 0);
       const monthPrefix = dateKey.slice(0, 7);
       const monthTokens = Object.entries(tokensMap)
         .filter(([key]) => key.startsWith(monthPrefix) && key <= dateKey)
@@ -765,8 +774,10 @@ function levelArtUrl(level) {
         rank30,
         rankedDays: ranked.length,
         monthTokens,
+        monthTotal,
+        monthDays,
         sameWeekday,
-        trend30: last30,
+        trend30: monthDays.map((item) => item.tokens),
         active: tokens > 0 || sessions > 0 || prompts > 0 || unlocks.length > 0,
       };
     }
@@ -876,8 +887,8 @@ function levelArtUrl(level) {
 .cq-overlay>*{pointer-events:auto}
 .cq-hud{display:flex;flex-direction:column;align-items:flex-end}
 .cq-dash{display:flex;flex-direction:column;gap:12px}
-/* ── 日报：昨天的总结 + 近 7 天对照 ── */
-.cq-daily{display:flex;flex-direction:column;gap:12px}
+/* ── 日报：昨天的总结 + 近 30 天横滑对照 ── */
+.cq-daily{display:flex;flex-direction:column;gap:12px;width:100%;max-width:1040px;margin:0 auto}
 .cq-dailyhero{position:relative;overflow:hidden;border-radius:18px;padding:16px 18px 30px;color:#fff;background:linear-gradient(135deg,#4d6bfe,#7c5cff 48%,#a855f7);box-shadow:0 16px 38px rgba(77,107,254,.26)}
 .cq-dailyspark{position:absolute;left:0;right:0;bottom:0;width:100%;height:58px;pointer-events:none;opacity:.9}
 .cq-dailyhero::before{content:'';position:absolute;right:-70px;top:-100px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.42),transparent 62%);animation:cqHeroGlow 7s ease-in-out infinite;pointer-events:none}
@@ -895,8 +906,8 @@ function levelArtUrl(level) {
 .cq-dailydelta.down{background:rgba(239,68,68,.36)}
 .cq-dailycard{animation:cqDailyIn .32s ease-out both}
 @keyframes cqDailyIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-.cq-dailyweek{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;align-items:stretch;height:104px;margin-top:6px}
-.cq-dailycol{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;min-height:0;border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;border-radius:10px;transition:background .15s ease}
+.cq-dailyweek{display:flex;gap:6px;align-items:stretch;height:108px;margin-top:6px;overflow-x:auto;overflow-y:hidden;padding:0 10px 2px;scroll-snap-type:x proximity;scrollbar-width:thin;overscroll-behavior-x:contain;mask-image:linear-gradient(90deg,transparent 0,#000 6px,#000 calc(100% - 6px),transparent 100%)}
+.cq-dailycol{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 0 46px;height:100%;min-height:0;border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;border-radius:10px;transition:background .15s ease;scroll-snap-align:center}
 .cq-dailycol:hover{background:color-mix(in srgb,#4d6bfe 7%,transparent)}
 .cq-dailycol:focus-visible{outline:2px solid #4d6bfe;outline-offset:2px}
 .cq-dailybar{flex:1;width:100%;display:flex;align-items:flex-end;min-height:0;background:color-mix(in srgb,#4d6bfe 5%,transparent);border-radius:6px;overflow:hidden}
@@ -906,8 +917,7 @@ function levelArtUrl(level) {
 @keyframes cqBarGrow{from{transform:scaleY(.02);opacity:.35}to{transform:scaleY(1);opacity:1}}
 .cq-dailylbl{font-size:9.5px;color:var(--dsw-alias-label-secondary,#5b6472);font-variant-numeric:tabular-nums}
 .cq-dailycol.on .cq-dailylbl{color:#a855f7;font-weight:800}
-.cq-dailytip{position:absolute;bottom:calc(100% - 2px);left:50%;transform:translate(-50%,-2px);white-space:nowrap;font-size:9.5px;padding:3px 7px;border-radius:7px;background:rgba(23,28,38,.92);color:#fff;opacity:0;pointer-events:none;transition:opacity .15s ease,transform .15s ease;z-index:2}
-.cq-dailycol:hover .cq-dailytip,.cq-dailycol:focus-visible .cq-dailytip{opacity:1;transform:translate(-50%,-8px)}
+.cq-dailypeek{color:#a855f7;font-weight:700}
 .cq-dailycols{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);gap:10px}
 @media (max-width:720px){.cq-dailycols{grid-template-columns:1fr}}
 .cq-unlocklist{display:flex;flex-direction:column;gap:2px}
@@ -3683,13 +3693,25 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
     function DailyTab({ data, t, locale }) {
       const yesterday = shiftDayKey(dayKeyOf(Date.now()), -1);
       const [dayKey, setDayKey] = useState(yesterday);
+      const [hoverKey, setHoverKey] = useState(null);
       const report = buildDailyReport(data, dayKey);
       const isYesterday = dayKey === yesterday;
       const shownTokens = useCountUp(report.tokens);
-      const maxWeek = Math.max(1, ...report.week.map((item) => item.tokens));
+      const days = report.monthDays;
+      const peek = days.find((item) => item.key === hoverKey) || null;
+      const maxMonth = Math.max(1, ...days.map((item) => item.tokens));
       const delta = report.deltaPct;
       const deltaText = delta === null ? '' : `${delta >= 0 ? '+' : ''}${delta}%`;
       const spark = sparkLine(report.trend30, 320, 56);
+      const stripRef = useRef(null);
+
+      // 横滑条默认停在选中的那一天（昨天在最右端），切天时跟着挪过去。
+      useEffect(() => {
+        const box = stripRef.current;
+        if (!box || typeof box.querySelector !== 'function') return;
+        const active = box.querySelector('.cq-dailycol.on');
+        if (active && typeof active.scrollIntoView === 'function') active.scrollIntoView({ inline: 'center', block: 'nearest' });
+      }, [dayKey]);
 
       const badges = [];
       if (report.best) badges.push(t('dailyHeadlineBest'));
@@ -3762,17 +3784,23 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
           h(
             'div',
             { className: 'cq-panelhead' },
-            h('h4', null, t('dailyWeek')),
+            h('h4', null, t('dailyTrend')),
             h(
               'span',
-              { className: 'cq-note' },
-              `${t('dailyWeekTotal')} ${fmtTokens(report.weekTotal)} · ${t('dailyAvg')} ${fmtTokens(report.avg)}`,
+              { className: `cq-note${peek ? ' cq-dailypeek' : ''}` },
+              peek
+                ? `${fmtDayLabel(peek.key, locale, { month: 'long', day: 'numeric' })} · ${fmtTokens(peek.tokens)}${
+                    report.sessionsKnown ? ` · ${peek.sessions} ${t('dailySessions')}` : ''
+                  }`
+                : `${t('dailyTrendTotal')} ${fmtTokens(report.monthTotal)} · ${t('dailyAvgDay')} ${fmtTokens(
+                    report.monthTotal / days.length,
+                  )}`,
             ),
           ),
           h(
             'div',
-            { className: 'cq-dailyweek' },
-            report.week.map((item, index) =>
+            { className: 'cq-dailyweek', ref: stripRef },
+            days.map((item, index) =>
               h(
                 'button',
                 {
@@ -3781,19 +3809,18 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
                   className: `cq-dailycol${item.key === dayKey ? ' on' : ''}`,
                   title: `${item.key} · ${fmtTokens(item.tokens)}`,
                   onClick: () => setDayKey(item.key),
+                  onMouseEnter: () => setHoverKey(item.key),
+                  onMouseLeave: () => setHoverKey(null),
+                  onFocus: () => setHoverKey(item.key),
+                  onBlur: () => setHoverKey(null),
                 },
-                h(
-                  'span',
-                  { className: 'cq-dailytip' },
-                  `${fmtTokens(item.tokens)}${report.sessionsKnown ? ` · ${item.sessions} ${t('dailySessions')}` : ''}`,
-                ),
                 h(
                   'div',
                   { className: `cq-dailybar${item.tokens === 0 ? ' zero' : ''}` },
                   h('i', {
                     style: {
-                      height: item.tokens === 0 ? '3px' : `${Math.max(4, Math.round((item.tokens / maxWeek) * 100))}%`,
-                      animationDelay: `${index * 45}ms`,
+                      height: item.tokens === 0 ? '3px' : `${Math.max(4, Math.round((item.tokens / maxMonth) * 100))}%`,
+                      animationDelay: `${Math.min(index, 16) * 24}ms`,
                     },
                   }),
                 ),
