@@ -112,7 +112,7 @@ assert(
 // Panel not registered yet: the click must still close the bubble.
 const fallback = [];
 const bareToast = clientModule.__views.QuestToast({
-  entry: { kind: 'lore', item: { id: 'l1', title: '第一章' } },
+  entry: { kind: 'achievement', item: { id: 'a2', name: '探针', points: 5, desc: 'desc' } },
   t: (key) => key,
   onDone: () => fallback.push('done'),
 });

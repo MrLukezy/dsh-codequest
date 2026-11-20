@@ -104,6 +104,10 @@ assert(report.best === true, '3000 must beat the previous week');
 assert(report.streak === 5, `streak ${report.streak} (15th..19th are consecutive)`);
 assert(report.week.length === 7, 'week window');
 assert(report.week[6].key === yesterday && report.week[6].tokens === 3000, 'week ends on the day');
+assert(report.weekTotal === 8000, `week total ${report.weekTotal}`);
+assert(report.rank30 === 1 && report.rankedDays === 6, `rank ${report.rank30}/${report.rankedDays}`);
+assert(report.monthTokens === 8000, `month total ${report.monthTokens}`);
+assert(report.sameWeekday === 0, `same weekday last week ${report.sameWeekday}`);
 assert(report.active === true, 'active day');
 
 // A quiet day is still a valid report, but not an "active" one.
@@ -174,7 +178,8 @@ assert(typeof views.DailyTab === 'function', 'missing DailyTab');
 assert(typeof views.DailyDigest === 'function', 'missing DailyDigest');
 const tree = views.DailyTab({ data, t: (key) => key, locale: 'zh' });
 const walked = walk(tree);
-assert(walked.classes.some((name) => name.includes('cq-daily')), 'daily tab must render its root');
+assert(walked.classes.some((name) => name.includes('cq-dailyhero')), 'daily tab must render the hero');
+assert(walked.classes.some((name) => name.includes('cq-dailycol')), 'daily tab must render the 7-day bars');
 assert(walked.texts.includes('3000') || walked.texts.includes('3.0K'), 'daily tab must show the token total');
 assert(walked.texts.filter((text) => text === '+20' || text === '+40').length === 2, 'unlock rows');
 
