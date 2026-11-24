@@ -19,7 +19,7 @@ https://raw.githubusercontent.com/MrLukezy/dsh-code-review/main/market/index.jso
 **方式二：直接从 GitHub 装**
 
 ```
-plugin_manager { action: "install_bundle", target: "git+https://github.com/MrLukezy/dsh-codequest.git#v0.10.0" }
+plugin_manager { action: "install_bundle", target: "git+https://github.com/MrLukezy/dsh-codequest.git#v0.10.1" }
 ```
 
 **方式三：本地目录**
@@ -30,7 +30,9 @@ git clone https://github.com/MrLukezy/dsh-codequest.git
 
 然后把 target 指向仓库根目录的绝对路径。
 
-装好后插件行 id 是 `include:dsh-codequest`；改完 Host 代码用 disable → enable 重载，改完 Client 代码刷新页面。排行榜是可选功能，不配置也能单机玩。
+装好后插件行 id 是 `include:dsh-codequest`。开发时改 Host 代码用 disable → enable 重载（在 profile 里配了 HMR `root` 后保存即重载），改 Client 代码保存即热换、刷新只作兜底；排行榜是可选功能，不配置也能单机玩。
+
+**更新**：在「插件」页点 CodeQuest 的「更新」即可；带 HMR 的 profile 会即时停旧装新，不用重启 DSH。本地 `link:` 安装的，`git pull` 后 disable → enable 一次（Client 半区会自动热换）。
 
 ## 仓库结构
 
