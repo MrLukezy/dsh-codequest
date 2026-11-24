@@ -169,15 +169,39 @@ console.log('hud modes:', cases.length + 4, 'checks');
 // Card effects default on; each one can be switched off without touching the others.
 clientModule.__store.data = { prefs: { hud: 'open' } };
 const fxDefault = hud.hudFx();
-if (!fxDefault.laser || !fxDefault.flow || !fxDefault.color) {
-  throw new Error('all three card effects must default to on');
+if (!fxDefault.laser || !fxDefault.flow || !fxDefault.color || !fxDefault.line) {
+  throw new Error('all four card effects must default to on');
 }
-clientModule.__store.data = { prefs: { hud: 'open', hudFx: { laser: false, color: false } } };
+clientModule.__store.data = { prefs: { hud: 'open', hudFx: { laser: false, color: false, line: false } } };
 const fxCustom = hud.hudFx();
-if (fxCustom.laser !== false || fxCustom.flow !== true || fxCustom.color !== false) {
+if (fxCustom.laser !== false || fxCustom.flow !== true || fxCustom.color !== false || fxCustom.line !== false) {
   throw new Error(`stored effects were not honoured: ${JSON.stringify(fxCustom)}`);
 }
 console.log('hud effects: default on + per-effect overrides');
+
+// A real point gain starts the bar from the old fill; level changes and
+// resets snap instead of leaving a ghost of the previous level.
+const barPrev = { pct: 40, points: 100, level: 3 };
+const barGain = hud.levelBarChange(barPrev, { pct: 44.5, points: 120, level: 3 });
+if (!barGain.gained || barGain.from !== 40 || barGain.ghost !== 40) {
+  throw new Error(`a point gain must start from the old fill: ${JSON.stringify(barGain)}`);
+}
+if (hud.levelBarChange(barPrev, { pct: 40, points: 100, level: 3 }).gained) {
+  throw new Error('no point gain must not animate');
+}
+if (hud.levelBarChange(barPrev, { pct: 5, points: 130, level: 4 }).gained) {
+  throw new Error('a level-up must snap to the new level instead of ghosting');
+}
+if (hud.levelBarChange(barPrev, { pct: 10, points: 100, level: 3 }).gained) {
+  throw new Error('a reset without new points must snap');
+}
+console.log('hud level bar: point gain ghosts from the old fill');
+
+// The mini curve is a smooth cubic path, not a jagged polyline.
+const curve = hud.smoothSparkPath([{ x: 0, y: 20 }, { x: 10, y: 2 }, { x: 20, y: 18 }], 24);
+if (!curve.startsWith('M0.0,20.0') || !curve.includes(' C') || !curve.endsWith('20.0,18.0')) {
+  throw new Error(`the sparkline must be a smooth cubic path: ${curve}`);
+}
 
 // --- HUD drag: the pill's handle is the expand button itself --------------
 // 缩略态的拖拽手柄就是 pill 的展开按钮；早期实现只要 pointerdown 落在
@@ -269,6 +293,18 @@ const playing = mount({
 stageOf(playing).props.onClick({ stopPropagation() {} });
 if (closed !== 0 || done !== 0) throw new Error('stage click must not close the film');
 if (actionsOf(playing)) throw new Error('playback must not show the end actions yet');
+if (!findByClass(stageOf(playing), 'cq-filmring') || !findByClass(stageOf(playing), 'cq-filmflash')) {
+  throw new Error('the stamp film must render its impact ring and flash');
+}
+// The stamp must land early and the whole film must stay short enough to feel like a hit.
+const filmSeam = clientModule.__film;
+if (filmSeam.spec.common.dur > 1.5 || filmSeam.spec.legendary.dur > 2.0) {
+  throw new Error(`the unlock film is still too slow: ${JSON.stringify(filmSeam.spec)}`);
+}
+if (filmSeam.phaseAt(0.09) !== 'glow' || filmSeam.phaseAt(0.1) !== 'burst' || filmSeam.phaseAt(0.2) !== 'name'
+  || filmSeam.phaseAt(0.46) !== 'desc' || filmSeam.phaseAt(0.72) !== 'settle') {
+  throw new Error('the stamp phases must land early and in order');
+}
 // 播放中点空白 = 直接关闭，并补记已看。
 playing.props.onClick();
 if (closed !== 1 || done !== 1) throw new Error(`blank click must close and mark seen (done=${done}, closed=${closed})`);
@@ -292,6 +328,34 @@ if (closed !== 2) throw new Error('backdrop after the film ended should close it
 actions.children[1].props.onClick({ stopPropagation() {} });
 if (detail !== 1) throw new Error(`detail button must call onOpenDetail (got ${detail})`);
 console.log('unlock film: blank/close/detail wired');
+
+// --- level up: banner + rolling level + dissolving title --------------------
+const collect = (node, cls, out = []) => {
+  if (Array.isArray(node)) {
+    for (const child of node) collect(child, cls, out);
+    return out;
+  }
+  if (!node || typeof node !== 'object') return out;
+  if (node.props && node.props.className === cls) out.push(node);
+  for (const child of node.children || []) collect(child, cls, out);
+  return out;
+};
+const banner = views.LevelUpBanner({ event: { to: 18 } });
+if (!findByClass(banner, 'cq-levelup')) throw new Error('level up must render its banner');
+if (!banner.children.some((node) => node.children && node.children.includes('LEVEL UP!'))) {
+  throw new Error('level up banner must say LEVEL UP!');
+}
+if (!banner.children.some((node) => node.children && node.children.includes('Lv.18'))) {
+  throw new Error('level up banner must show the new level');
+}
+const roll = views.LevelRoll({ level: 18, from: 17, active: true });
+if (!findByClass(roll, 'cq-levelrollold') || !findByClass(roll, 'cq-levelrollnew')) {
+  throw new Error('a level change must render both the old and rolling new level');
+}
+const morph = views.TitleMorph({ title: 'AI 编排官', previous: '资深提示工程师', active: true });
+if (collect(morph, 'cq-titlechar out').length !== 7) throw new Error('every old title character must dissolve');
+if (collect(morph, 'cq-titlechar in').length !== 6) throw new Error('the new title must be replaced character by character');
+console.log('level up: banner + rolling level + title dissolve');
 
 // --- unlock film: NEW badge baseline -------------------------------------
 // 首次运行只留最近 3 枚带 NEW，否则一屏全是新；看完后要能立刻落盘。

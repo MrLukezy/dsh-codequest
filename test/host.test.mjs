@@ -218,7 +218,7 @@ console.log('cloud base (after clearing):', cleared.body.base);
 // Card effects live in prefs.hudFx; a partial update must keep the other switches.
 const fxUpdate = await invoke('/dsh-codequest/config', 'POST', { hudFx: { laser: false, color: false } });
 if (fxUpdate.status !== 200) throw new Error(`hudFx config failed: ${fxUpdate.status}`);
-const fxExpected = { laser: false, flow: true, color: false };
+const fxExpected = { laser: false, flow: true, color: false, line: true };
 if (JSON.stringify(fxUpdate.body.hudFx) !== JSON.stringify(fxExpected)) {
   throw new Error(`hudFx update must merge, got ${JSON.stringify(fxUpdate.body.hudFx)}`);
 }

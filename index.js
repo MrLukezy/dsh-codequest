@@ -59,7 +59,7 @@ const MAX_BODY_BYTES = 64 * 1024;
 /** Accepted values for the floating-card preference (`prefs.hud`). */
 const HUD_MODES = new Set(['pill', 'open', 'bar', 'off']);
 /** Card effects (`prefs.hudFx`): each can be switched off independently. */
-const HUD_FX_KEYS = ['laser', 'flow', 'color'];
+const HUD_FX_KEYS = ['laser', 'flow', 'color', 'line'];
 /**
  * 反破解约定：前 5 次请求都会被劝回，第 6 次才真的开门（解锁隐藏成就
  * 「破解者」并允许客户端进入破解模式）。这个数字同时也是成就的 target，
@@ -126,7 +126,7 @@ function defaultState() {
      * `hud`: 'pill' | 'open' | 'bar' | 'off' — the floating card's default form.
      * `hudFx`: card motion effects, each switchable from 数据 → 悬浮窗.
      */
-    prefs: { hud: 'pill', hudFx: { laser: true, flow: true, color: true } },
+    prefs: { hud: 'pill', hudFx: { laser: true, flow: true, color: true, line: true } },
     /**
      * 破解请求计数。只增不减：`attempts` 前 5 次只返回劝阻文案，第 6 次写入
      * `unlockedAt` 并解锁隐藏成就「破解者」。破解模式本身只影响客户端展示

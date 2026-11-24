@@ -174,7 +174,7 @@ const dash = walk(views.DashboardTab({ data: payload, t, reload: async () => {} 
 if (!dash.text.includes('crackButton') && !dash.text.includes('crackModeOn')) {
   throw new Error('the dashboard lost its crack entry');
 }
-for (const key of ['hudFx', 'hudFxLaser', 'hudFxFlow', 'hudFxColor']) {
+for (const key of ['hudFx', 'hudFxLaser', 'hudFxFlow', 'hudFxColor', 'hudFxLine']) {
   if (!dash.text.includes(key)) throw new Error(`the dashboard lost the ${key} effect control`);
 }
 for (const stage of [1, 3, 5, 6]) {
@@ -226,7 +226,8 @@ if (!film.text.some((line) => String(line).includes(unlockedItem.points))) {
 // A missing/absent rAF timestamp must not freeze the film at the blank glow
 // phase; and a missing badge file must still leave the emoji in the DOM.
 if (mod.__film.phaseAt(NaN) !== 'glow') throw new Error('NaN progress must fall back to the glow phase');
-if (mod.__film.phaseAt(0.5) !== 'name') throw new Error('halfway through the film must be the name phase');
+if (mod.__film.phaseAt(0.3) !== 'name') throw new Error('the stamp phase must land early in the film');
+if (mod.__film.phaseAt(0.5) !== 'desc') throw new Error('the condition must follow the stamp quickly');
 if (mod.__film.phaseAt(1) !== 'settle') throw new Error('the film must end at the settle phase');
 if (!film.text.some((line) => String(line) === String(unlockedItem.icon || '🏆'))) {
   throw new Error('unlock film must keep an emoji fallback for a missing badge image');

@@ -27,6 +27,7 @@ window.__ModuleLoader__.load({
     const React = require('react');
     const h = React.createElement;
     const { useState, useEffect, useMemo, useCallback, useRef } = React;
+    const useBeforePaint = React.useLayoutEffect || useEffect;
 
     const NS = 'dsh-codequest';
     /** `main` panel id; the sidebar entry and the header button both target it. */
@@ -206,10 +207,11 @@ window.__ModuleLoader__.load({
         hudModeOpen: '展开',
         hudModeOff: '关闭',
         hudFx: '卡片动效',
-        hudFxHint: '给展开的悬浮卡片加一点光效，可单独开关；系统开启「减少动态效果」时会自动停用',
+        hudFxHint: '给展开的悬浮卡片加一点光效和曲线动画，可单独开关；系统开启「减少动态效果」时会自动停用',
         hudFxLaser: '镭射',
         hudFxFlow: '流动',
         hudFxColor: '炫彩',
+        hudFxLine: '曲线',
         hudBarOpen: '点一下展开卡片',
         hudReset: '复位位置',
         dshAccount: 'DeepSeek 账号',
@@ -467,10 +469,11 @@ window.__ModuleLoader__.load({
         hudModeOpen: 'Expanded',
         hudModeOff: 'Off',
         hudFx: 'Card effects',
-        hudFxHint: 'Light effects for the expanded card; toggle each one separately. They turn off automatically with reduced motion.',
+        hudFxHint: 'Light effects and curve motion for the expanded card; toggle each one separately. They turn off automatically with reduced motion.',
         hudFxLaser: 'Laser',
         hudFxFlow: 'Flow',
         hudFxColor: 'Iridescent',
+        hudFxLine: 'Curve',
         hudBarOpen: 'Click to expand',
         hudReset: 'Reset position',
         dshAccount: 'DeepSeek account',
@@ -830,8 +833,26 @@ function levelArtUrl(level) {
 .cq-btn:hover{border-color:var(--dsw-alias-brand-primary,#4d6bfe)}
 .cq-btn:disabled{opacity:.5;cursor:default}
 .cq-btn.primary{background:var(--dsw-alias-button-primary-fill,#4d6bfe);border-color:transparent;color:#fff;font-weight:600}
-.cq-levelbar{height:7px;border-radius:999px;background:color-mix(in srgb,var(--dsw-alias-label-secondary,#5b6472) 18%,transparent);overflow:hidden;margin-top:6px}
+.cq-levelbar{height:7px;border-radius:999px;background:color-mix(in srgb,var(--dsw-alias-label-secondary,#5b6472) 18%,transparent);overflow:hidden;margin-top:6px;position:relative}
 .cq-levelbar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#4d6bfe,#a855f7)}
+/* 积分增加：旧进度先留一层虚影，再延迟把实条推上去。 */
+.cq-levelfill{position:relative;z-index:1;overflow:hidden}
+.cq-levelfill.growing{box-shadow:0 0 8px rgba(168,85,247,.55)}
+.cq-levelshine{position:absolute;top:-30%;bottom:-30%;left:-55%;width:42%;pointer-events:none;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(103,232,249,.35) 30%,rgba(255,255,255,.85) 50%,rgba(244,114,182,.35) 70%,rgba(255,255,255,0));transform:skewX(-18deg);animation:cqBarShine 2.8s cubic-bezier(.4,0,.2,1) infinite}
+@keyframes cqBarShine{0%{left:-55%;opacity:0}10%{opacity:1}88%{left:115%;opacity:1}100%{left:115%;opacity:0}}
+.cq-levelhead{position:absolute;top:50%;width:11px;height:11px;margin-left:-5.5px;border-radius:50%;z-index:2;transform:translateY(-50%);pointer-events:none;background:radial-gradient(circle,#fff 0 28%,rgba(196,181,253,.9) 45%,transparent 72%);animation:cqBarHead .9s ease-out forwards}
+@keyframes cqBarHead{0%{opacity:0;transform:translateY(-50%) scale(.4)}25%{opacity:1}100%{opacity:0;transform:translateY(-50%) scale(1.6)}}
+.cq-levelghost{position:absolute;left:0;top:0;height:100%;z-index:2;border-radius:999px;background:linear-gradient(90deg,rgba(103,232,249,.55),rgba(244,114,182,.5));filter:blur(1px);transform-origin:left center;animation:cqBarGhost 1.5s ease-out forwards;pointer-events:none}
+@keyframes cqBarGhost{0%{opacity:.8;transform:scaleX(1)}55%{opacity:.4}100%{opacity:0;transform:scaleX(1.03)}}
+.cq-levelmark{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;border-radius:2px;background:#fff;box-shadow:0 0 8px 2px rgba(103,232,249,.9),0 0 16px 4px rgba(244,114,182,.55);z-index:3;animation:cqBarMark 1.4s ease-out forwards;pointer-events:none}
+@keyframes cqBarMark{0%{opacity:0;transform:scaleY(.4)}12%{opacity:1;transform:scaleY(1)}70%{opacity:.75}100%{opacity:0}}
+@media (prefers-reduced-motion: reduce){
+  .cq-levelfill{transition:none!important}
+  .cq-levelghost{display:none}
+  .cq-levelmark{display:none}
+  .cq-levelshine{display:none}
+  .cq-levelhead{display:none}
+}
 .cq-tabs{display:flex;gap:4px;border-bottom:1px solid var(--dsw-alias-border-l2,#e3e6eb);padding-bottom:0}
 .cq-tab{border:0;background:none;font:inherit;font-size:12.5px;color:var(--dsw-alias-label-secondary,#5b6472);padding:7px 12px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
 .cq-tab.on{color:var(--dsw-alias-brand-primary,#4d6bfe);border-bottom-color:var(--dsw-alias-brand-primary,#4d6bfe);font-weight:650}
@@ -904,7 +925,7 @@ function levelArtUrl(level) {
 .cq-card.cq-locate::after{opacity:1;animation:cqShine 1s ease-out 2}
 .cq-overlay{position:fixed;right:16px;bottom:92px;z-index:60;display:flex;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:none;max-width:min(320px,calc(100vw - 32px))}
 .cq-overlay>*{pointer-events:auto}
-.cq-hud{display:flex;flex-direction:column;align-items:flex-end}
+.cq-hud{position:relative;display:flex;flex-direction:column;align-items:flex-end}
 .cq-dash{display:flex;flex-direction:column;gap:12px}
 /* ── 日报：昨天的总结 + 近 30 天横滑对照 ── */
 .cq-daily{display:flex;flex-direction:column;gap:12px;width:100%;max-width:1040px;margin:0 auto}
@@ -1028,6 +1049,7 @@ function levelArtUrl(level) {
 @keyframes cqLiveRing{0%{transform:scale(.55);opacity:.9}70%,100%{transform:scale(1.6);opacity:0}}
 .cq-hudpill.live{border-color:color-mix(in srgb,#22c55e 42%,var(--dsw-alias-border-l2,#e3e6eb))}
 .cq-hudnum{display:inline-block}
+.cq-countup{font-variant-numeric:tabular-nums}
 .cq-hudnum.tick{animation:cqNumTick .55s ease-out}
 @keyframes cqNumTick{0%{color:#16a34a;transform:translateY(2px)}60%{color:#16a34a}100%{color:var(--dsw-alias-label-secondary,#5b6472);transform:none}}
 .cq-sparkdot{fill:#4d6bfe}
@@ -1055,21 +1077,28 @@ html.cq-has-bar #root{padding-bottom:var(--cq-bar-h,40px);box-sizing:border-box}
 .cq-hudlive.bar{width:8px;height:8px;margin:0}
 @media (prefers-reduced-motion: reduce){
   .cq-hudlive.on,.cq-hudlive.on::after,.cq-sparkdot.on,.cq-hudnum.tick{animation:none}
-  .cq-hudcard .cq-spark polyline{animation:none;stroke-dashoffset:0}
+  .cq-spark-anim .cq-sparkline{animation:none;stroke-dashoffset:0}
+  .cq-sparkcomet{display:none}
+  .cq-sparkhalo{animation:none}
   .cq-card.cq-locate::after{animation:none}
+  .cq-levelup{animation:none}
+  .cq-levelupglow{display:none}
+  .cq-levelrollold,.cq-titleold{display:none}
+  .cq-levelrollnew,.cq-titlechar{animation:none!important;opacity:1!important;filter:none!important;transform:none!important}
 }
 .cq-hudcard{width:272px;border:1px solid var(--dsw-alias-border-l2,#e3e6eb);background:color-mix(in srgb,var(--dsw-alias-bg-layer-1,#fff) 94%,transparent);backdrop-filter:blur(12px);border-radius:14px;padding:11px 12px 10px;box-shadow:0 10px 30px rgba(20,26,40,.18)}
 /* 卡片动效：三个开关各自独立，全部只用 CSS，避免 HUD 每帧跑 JS。 */
 @property --cq-flow-angle{syntax:'<angle>';inherits:false;initial-value:0deg}
 .cq-hudcard.cq-fx-flow::before{content:'';position:absolute;inset:0;border-radius:inherit;padding:1px;background:conic-gradient(from var(--cq-flow-angle,0deg),rgba(77,107,254,0) 0deg,#4d6bfe 70deg,#a855f7 140deg,#22d3ee 210deg,rgba(34,211,238,0) 290deg 360deg);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;animation:cqFlowAngle 6.5s linear infinite;pointer-events:none}
 @keyframes cqFlowAngle{to{--cq-flow-angle:360deg}}
-.cq-hudcard.cq-fx-laser{overflow:hidden}
-.cq-hudcard.cq-fx-laser::after{content:'';position:absolute;top:-30%;bottom:-30%;left:-60%;width:26%;background:linear-gradient(90deg,rgba(56,189,248,0),rgba(56,189,248,.32) 42%,rgba(255,255,255,.38) 50%,rgba(217,70,239,.32) 58%,rgba(217,70,239,0));transform:skewX(-16deg);opacity:0;pointer-events:none;animation:cqLaserSweep 7s cubic-bezier(.35,0,.2,1) infinite}
-@keyframes cqLaserSweep{0%,54%{left:-60%;opacity:0}58%{opacity:.72}72%{left:118%;opacity:.46}74%,100%{left:118%;opacity:0}}
+.cq-hudcard.cq-fx-laserhover{overflow:hidden}
+.cq-hudcard.cq-fx-laserhover::after{content:'';position:absolute;top:-30%;bottom:-30%;left:-60%;width:26%;background:linear-gradient(90deg,rgba(56,189,248,0),rgba(56,189,248,.32) 42%,rgba(255,255,255,.38) 50%,rgba(217,70,239,.32) 58%,rgba(217,70,239,0));transform:skewX(-16deg);opacity:0;pointer-events:none;animation:none}
+.cq-hudcard.cq-fx-laserhover:hover::after{animation:cqLaserSweep .95s cubic-bezier(.3,0,.2,1)}
+@keyframes cqLaserSweep{0%{left:-60%;opacity:0}12%{opacity:.72}78%{left:118%;opacity:.5}100%{left:118%;opacity:0}}
 .cq-hudcard.cq-fx-color{animation:cqColorGlow 9s ease-in-out infinite}
 @keyframes cqColorGlow{0%,100%{box-shadow:0 10px 30px rgba(20,26,40,.18),0 0 0 1px rgba(77,107,254,.34),0 0 24px rgba(77,107,254,.26)}33%{box-shadow:0 10px 30px rgba(20,26,40,.18),0 0 0 1px rgba(168,85,247,.38),0 0 26px rgba(168,85,247,.28)}66%{box-shadow:0 10px 30px rgba(20,26,40,.18),0 0 0 1px rgba(34,211,238,.38),0 0 26px rgba(34,211,238,.26)}}
 @media (prefers-reduced-motion: reduce){
-  .cq-hudcard.cq-fx-laser::after{display:none}
+  .cq-hudcard.cq-fx-laserhover::after{display:none}
   .cq-hudcard.cq-fx-flow::before,.cq-hudcard.cq-fx-color{animation:none}
 }
 /* 新版本提示：卡片上方的小胶囊，点一下去插件市场更新。 */
@@ -1083,12 +1112,51 @@ html.cq-has-bar #root{padding-bottom:var(--cq-bar-h,40px);box-sizing:border-box}
 .cq-hudhead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .cq-hudhead img{width:30px;height:30px;border-radius:50%;object-fit:cover;box-shadow:0 0 0 2px color-mix(in srgb,#4d6bfe 40%,transparent)}
 .cq-hudtitle{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cq-levelup-active{overflow:visible}
 .cq-hudsub{font-size:10.5px;color:var(--dsw-alias-label-secondary,#5b6472);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 等级数字：旧数字向上滚出，新数字从下方带缩放落位；速度刻意放慢。 */
+.cq-levelroll{position:relative;display:inline-block;white-space:nowrap;vertical-align:bottom;line-height:1.15}
+.cq-levelrollold{position:absolute;left:0;top:0;white-space:nowrap;pointer-events:none;animation:cqLevelOut 1s cubic-bezier(.4,0,.2,1) both}
+.cq-levelrollnew{display:inline-block;white-space:nowrap;animation:cqLevelIn 1.45s cubic-bezier(.2,.8,.2,1) .18s both}
+@keyframes cqLevelOut{0%{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}100%{opacity:0;transform:translateY(-125%) scale(.72);filter:blur(4px)}}
+@keyframes cqLevelIn{0%{opacity:0;transform:translateY(120%) scale(1.55);filter:blur(7px)}
+  40%{opacity:1;transform:translateY(0) scale(1.12);filter:blur(0)}
+  68%{transform:translateY(0) scale(.98)}
+  100%{opacity:1;transform:none;filter:blur(0)}}
+/* 标题：旧字逐个消融，新字逐个浮现；旧标题多出来的尾巴也会一起化掉。 */
+.cq-titlemorph{position:relative;display:inline-block;white-space:nowrap;vertical-align:bottom}
+.cq-titleold{position:absolute;left:0;top:0;white-space:nowrap;pointer-events:none}
+.cq-titlechar{display:inline-block;will-change:opacity,transform,filter}
+.cq-titlechar.out{animation:cqTitleOut .7s ease forwards}
+.cq-titlechar.in{opacity:0;animation:cqTitleIn .46s cubic-bezier(.2,.9,.2,1) forwards}
+@keyframes cqTitleOut{0%{opacity:1;filter:blur(0);transform:none}100%{opacity:0;filter:blur(6px);transform:translateY(-5px) scale(.82)}}
+@keyframes cqTitleIn{0%{opacity:0;filter:blur(4px);transform:translateY(5px)}100%{opacity:1;filter:blur(0);transform:none}}
+/* 大号 LEVEL UP! 先砸一下，再让位给等级数字。 */
+.cq-levelup{position:absolute;left:50%;bottom:calc(100% + 14px);z-index:2147482500;transform:translateX(-50%);pointer-events:none;
+  display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;
+  animation:cqLevelUp 3.2s cubic-bezier(.2,.85,.2,1) both}
+.cq-levelupglow{position:absolute;left:50%;top:50%;width:250px;height:120px;margin:-60px 0 0 -125px;border-radius:50%;
+  background:radial-gradient(circle,color-mix(in srgb,#a855f7 42%,transparent),transparent 70%);filter:blur(20px)}
+.cq-levelupword{position:relative;font-size:12px;font-weight:900;letter-spacing:.32em;text-indent:.32em;color:#a855f7;text-shadow:0 0 14px rgba(168,85,247,.55)}
+.cq-levelupnum{position:relative;font-size:40px;line-height:1.05;font-weight:900;letter-spacing:-.02em;
+  background:linear-gradient(135deg,#4d6bfe,#a855f7 52%,#f472b6);-webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 4px 18px rgba(124,58,237,.35))}
+@keyframes cqLevelUp{0%{opacity:0;transform:translate(-50%,24px) scale(1.6);filter:blur(10px)}
+  10%{opacity:1;transform:translate(-50%,0) scale(.92);filter:blur(0)}
+  18%{transform:translate(-50%,0) scale(1.04)}
+  25%,72%{opacity:1;transform:translate(-50%,0) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-16px) scale(1)}}
 .cq-hudx{border:0;background:none;font:inherit;font-size:15px;line-height:1;color:var(--dsw-alias-label-secondary,#5b6472);cursor:pointer;padding:0 2px}
 .cq-hudrow{display:flex;justify-content:space-between;font-size:10.5px;color:var(--dsw-alias-label-secondary,#5b6472);margin:6px 0 2px}
-.cq-spark{display:block;width:100%}
-/* 展开时曲线从左往右画出来，收起/展开切换不至于硬切。 */
-.cq-hudcard .cq-spark polyline{stroke-dasharray:1;stroke-dashoffset:1;animation:cqSparkDraw .8s cubic-bezier(.2,.8,.3,1) forwards}
+.cq-spark{display:block;width:100%;overflow:visible}
+.cq-sparkarea{opacity:.95}
+.cq-sparkline{filter:drop-shadow(0 1px 2px rgba(77,107,254,.35))}
+.cq-sparkhalo{fill:rgba(77,107,254,.1);stroke:rgba(77,107,254,.32);stroke-width:.8;transform-box:fill-box;transform-origin:center}
+@keyframes cqSparkHalo{0%,100%{opacity:.45;transform:scale(.9)}50%{opacity:.95;transform:scale(1.18)}}
+.cq-sparkcomet{fill:#fff;filter:drop-shadow(0 0 3px #22d3ee) drop-shadow(0 0 6px rgba(168,85,247,.8));pointer-events:none}
+/* 展开时曲线从左往右画出来，再让一颗小彗星沿着它跑。 */
+.cq-spark-anim .cq-sparkline{stroke-dasharray:1;stroke-dashoffset:1;animation:cqSparkDraw .9s cubic-bezier(.2,.8,.3,1) forwards}
+.cq-spark-anim .cq-sparkhalo{animation:cqSparkHalo 3.4s ease-in-out infinite}
 @keyframes cqSparkDraw{to{stroke-dashoffset:0}}
 .cq-toasts{display:flex;flex-direction:column;gap:8px;align-items:flex-end}
 .cq-toast{display:flex;align-items:center;gap:9px;min-width:212px;max-width:280px;border:1px solid color-mix(in srgb,#4d6bfe 35%,transparent);background:color-mix(in srgb,var(--dsw-alias-bg-layer-1,#fff) 96%,transparent);backdrop-filter:blur(10px);border-radius:12px;padding:8px 11px;font:inherit;cursor:pointer;box-shadow:0 10px 26px rgba(20,26,40,.2);animation:cqToastIn .22s ease-out}
@@ -1166,7 +1234,7 @@ html.cq-has-bar #root{padding-bottom:var(--cq-bar-h,40px);box-sizing:border-box}
 .cq-film{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;
   background:color-mix(in srgb,var(--dsw-alias-bg-layer-1,#fff) 18%,transparent);
   backdrop-filter:blur(10px) saturate(1.04);
-  animation:cqFilmIn .25s ease-out}
+  animation:cqFilmIn .18s ease-out}
 @keyframes cqFilmIn{from{opacity:0}to{opacity:1}}
 /* 不压黑整页：只把身后的界面虚化，舞台是一块透明排版区，粒子画在整屏 canvas 上。 */
 .cq-filmstage{position:relative;width:min(430px,86vw);height:min(560px,82vh);overflow:visible;
@@ -1176,49 +1244,74 @@ html.cq-has-bar #root{padding-bottom:var(--cq-bar-h,40px);box-sizing:border-box}
 .cq-filmcenter{position:relative;display:flex;align-items:center;justify-content:center}
 .cq-filmhalo{position:absolute;left:50%;top:50%;width:260px;height:260px;margin:-130px 0 0 -130px;border-radius:50%;
   background:radial-gradient(circle,color-mix(in srgb,var(--cq-r) 55%,transparent),transparent 68%);
-  filter:blur(18px);opacity:0;transition:opacity .5s ease,transform .9s cubic-bezier(.2,.9,.3,1);transform:scale(.35)}
+  filter:blur(18px);opacity:0;transition:opacity .18s ease-out,transform .32s cubic-bezier(.2,.9,.3,1);transform:scale(.35)}
 /* 光晕先收拢再张开，徽章在它聚拢的位置成形。 */
 .cq-filmstage.p-glow .cq-filmhalo{opacity:.45;transform:scale(.4)}
-.cq-filmstage.p-burst .cq-filmhalo{opacity:.6;transform:scale(1.25)}
+.cq-filmstage.p-burst .cq-filmhalo{opacity:.75;transform:scale(1.3)}
 .cq-filmstage.p-name .cq-filmhalo,.cq-filmstage.p-desc .cq-filmhalo,
 .cq-filmstage.p-settle .cq-filmhalo{opacity:.9;transform:scale(1)}
+/* 盖章：从上方带着重影砸下来，压扁、回弹，最后定住。 */
+.cq-filmstage.p-name .cq-filmcenter{animation:cqFilmShake .22s cubic-bezier(.2,.7,.2,1) .06s}
+@keyframes cqFilmShake{0%,100%{transform:translate(0,0)}22%{transform:translate(0,3px)}42%{transform:translate(-2px,1px)}64%{transform:translate(2px,-1px)}82%{transform:translate(-1px,0)}}
+.cq-filmflash{position:absolute;left:50%;top:50%;width:290px;height:290px;margin:-145px 0 0 -145px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,255,255,.95),color-mix(in srgb,var(--cq-r) 38%,transparent) 42%,transparent 70%);
+  filter:blur(2px);opacity:0;pointer-events:none;transform:scale(.6)}
+.cq-filmstage.p-name .cq-filmflash{animation:cqFilmFlash .24s ease-out .06s both}
+@keyframes cqFilmFlash{0%{opacity:0;transform:scale(.55)}18%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:scale(1.35)}}
 .cq-filmart{position:relative;width:132px;height:132px;border-radius:34px;overflow:hidden;display:flex;
-  align-items:center;justify-content:center;font-size:52px;opacity:0;transform:scale(.32);filter:blur(12px);
-  box-shadow:0 0 0 2px color-mix(in srgb,var(--cq-r) 70%,transparent),0 18px 50px color-mix(in srgb,var(--cq-r) 45%,transparent);
-  transition:opacity .55s ease,transform .85s cubic-bezier(.2,1.35,.35,1),filter .55s ease}
+  align-items:center;justify-content:center;font-size:52px;opacity:0;transform-origin:50% 70%;
+  transform:translateY(-34px) scale(1.65) rotate(-3deg);filter:blur(10px);will-change:transform,opacity,filter;
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--cq-r) 70%,transparent),0 18px 50px color-mix(in srgb,var(--cq-r) 45%,transparent)}
 .cq-filmart img{width:100%;height:100%;object-fit:cover}
-/* 前两个相位完全看不到图标：先散粒子，再让徽章从模糊里长出来。 */
 .cq-filmstage.p-name .cq-filmart,.cq-filmstage.p-desc .cq-filmart,
-.cq-filmstage.p-settle .cq-filmart{opacity:1;transform:scale(1);filter:blur(0)}
+.cq-filmstage.p-settle .cq-filmart{opacity:1;transform:none;filter:blur(0)}
+.cq-filmstage.p-name .cq-filmart{animation:cqFilmStamp .3s cubic-bezier(.2,.82,.2,1) both}
+@keyframes cqFilmStamp{0%{opacity:0;transform:translateY(-36px) scale(1.65) rotate(-3deg);filter:blur(10px)}
+  32%{opacity:1;transform:translateY(3px) scale(.9) rotate(0);filter:blur(0)}
+  55%{transform:translateY(-1px) scale(1.07)}
+  76%{transform:translateY(0) scale(.98)}
+  100%{transform:none;filter:blur(0)}}
+.cq-filmring{position:absolute;left:50%;top:50%;width:132px;height:132px;margin:-66px 0 0 -66px;border-radius:38px;
+  border:2px solid color-mix(in srgb,var(--cq-r) 74%,#fff);box-shadow:0 0 18px color-mix(in srgb,var(--cq-r) 48%,transparent);
+  opacity:0;pointer-events:none;transform:scale(.62)}
+.cq-filmstage.p-name .cq-filmring{animation:cqFilmRing .34s cubic-bezier(.15,.8,.25,1) .06s both}
+@keyframes cqFilmRing{0%{opacity:.95;transform:scale(.62)}65%{opacity:.4}100%{opacity:0;transform:scale(1.5)}}
 .cq-filmtext{position:relative;text-align:center;padding:12px 20px;max-width:min(100%,360px);border-radius:16px;
   background:color-mix(in srgb,var(--dsw-alias-bg-layer-1,#fff) 88%,transparent);
   border:1px solid color-mix(in srgb,var(--cq-r) 26%,transparent);
   box-shadow:0 14px 40px color-mix(in srgb,var(--cq-r) 18%,rgba(16,24,40,.14));
-  backdrop-filter:blur(10px);opacity:0;transform:translateY(8px);
-  transition:opacity .5s ease .05s,transform .5s ease .05s}
+  backdrop-filter:blur(10px);opacity:0;transform:translateY(10px) scale(.97);
+  transition:opacity .2s ease-out .04s,transform .24s cubic-bezier(.2,1.2,.3,1) .04s}
 .cq-filmstage.p-name .cq-filmtext,.cq-filmstage.p-desc .cq-filmtext,
 .cq-filmstage.p-settle .cq-filmtext{opacity:1;transform:none}
 .cq-filmkicker{font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;
-  color:color-mix(in srgb,var(--cq-r) 82%,#1f2328);opacity:0;transform:translateY(6px);transition:.45s ease}
+  color:color-mix(in srgb,var(--cq-r) 82%,#1f2328);opacity:0;transform:translateY(6px);
+  transition:opacity .16s ease-out .06s,transform .2s ease-out .06s}
 .cq-filmstage.p-name .cq-filmkicker,.cq-filmstage.p-desc .cq-filmkicker,
 .cq-filmstage.p-settle .cq-filmkicker{opacity:1;transform:none}
 .cq-filmname{margin-top:8px;font-size:24px;font-weight:800;color:var(--dsw-alias-label-primary,#1f2328);
-  letter-spacing:.01em;line-height:1.3;opacity:0;transform:translateY(10px);transition:.5s ease}
+  letter-spacing:.01em;line-height:1.3;opacity:0;transform:translateY(10px);transition:.22s ease-out .08s}
 .cq-filmstage.p-name .cq-filmname,.cq-filmstage.p-desc .cq-filmname,
 .cq-filmstage.p-settle .cq-filmname{opacity:1;transform:none}
 .cq-filmpts{margin-top:6px;font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;
-  color:color-mix(in srgb,var(--cq-r) 78%,#1f2328);opacity:0;transition:.5s ease .1s}
+  color:color-mix(in srgb,var(--cq-r) 78%,#1f2328);opacity:0;transition:.18s ease-out .1s}
 .cq-filmstage.p-name .cq-filmpts,.cq-filmstage.p-desc .cq-filmpts,
 .cq-filmstage.p-settle .cq-filmpts{opacity:1}
 .cq-filmcond{margin-top:10px;font-size:11.5px;line-height:1.6;color:var(--dsw-alias-label-secondary,#5b6472);
-  opacity:0;transform:translateY(8px);transition:.5s ease}
+  opacity:0;transform:translateY(8px);transition:.22s ease-out}
 .cq-filmstage.p-desc .cq-filmcond,.cq-filmstage.p-settle .cq-filmcond{opacity:1;transform:none}
+@media (prefers-reduced-motion: reduce){
+  .cq-filmstage.p-name .cq-filmcenter{animation:none}
+  .cq-filmstage.p-name .cq-filmart,.cq-filmstage.p-name .cq-filmflash,.cq-filmstage.p-name .cq-filmring{animation:none}
+  .cq-filmflash,.cq-filmring{display:none}
+  .cq-filmart,.cq-filmtext,.cq-filmkicker,.cq-filmname,.cq-filmpts,.cq-filmcond{transition-duration:.01s!important}
+}
 .cq-filmfoot{height:40px;display:flex;align-items:center;justify-content:center;margin-top:2px}
 .cq-filmskip{font-size:10.5px;letter-spacing:.06em;
   color:var(--dsw-alias-label-secondary,#8a93a3);padding:5px 12px;border-radius:999px;
   background:color-mix(in srgb,var(--dsw-alias-bg-layer-1,#fff) 82%,transparent);
   border:1px solid var(--dsw-alias-border-l2,#e3e6eb)}
-.cq-filmactions{display:flex;gap:8px;opacity:0;animation:cqFilmIn .4s ease .1s forwards}
+.cq-filmactions{display:flex;gap:8px;opacity:0;animation:cqFilmIn .25s ease .05s forwards}
 .cq-filmactions .cq-btn{font-size:11.5px;padding:6px 14px;background:color-mix(in srgb,var(--dsw-alias-bg-layer-1,#fff) 92%,transparent)}
 .cq-dshrow{display:flex;align-items:center;gap:10px;margin-top:8px}
 .cq-dshavatar{width:38px;height:38px;border-radius:50%;object-fit:cover;flex:none;box-shadow:0 0 0 2px color-mix(in srgb,#4d6bfe 35%,transparent)}
@@ -1413,6 +1506,7 @@ html.cq-has-bar #root{padding-bottom:var(--cq-bar-h,40px);box-sizing:border-box}
 
     function LevelHeader({ data, t }) {
       const p = data.progress;
+      const levelEvent = useLevelUp(p.level, p.title);
       const pct = p.levelNeed > 0 ? Math.min(100, (p.levelInto / p.levelNeed) * 100) : 0;
       const avatar = levelArtUrl(p.level);
       return h(
@@ -1429,19 +1523,26 @@ html.cq-has-bar #root{padding-bottom:var(--cq-bar-h,40px);box-sizing:border-box}
               event.currentTarget.style.display = 'none';
             },
           }),
-          h('b', null, String(p.level)),
-          h('small', null, p.title),
+          h('b', null, h(LevelRoll, {
+            key: levelEvent ? levelEvent.id : 'lv',
+            level: p.level,
+            from: levelEvent && levelEvent.from,
+            active: Boolean(levelEvent),
+            prefix: '',
+          })),
+          h('small', null, h(TitleMorph, {
+            key: levelEvent ? levelEvent.id : 'title',
+            title: p.title,
+            previous: levelEvent && levelEvent.fromTitle,
+            active: Boolean(levelEvent),
+          })),
         ),
         h(
           'div',
           { className: 'cq-headtext' },
           h('div', { className: 'cq-title' }, t('title'), h('span', { className: 'cq-chip' }, `${p.points} ${t('points')}`)),
           h('div', { className: 'cq-sub' }, t('subtitle')),
-          h(
-            'div',
-            { className: 'cq-levelbar', title: `${p.levelInto}/${p.levelNeed}` },
-            h('i', { style: { width: `${pct}%` } }),
-          ),
+          h(HudLevelBar, { pct, points: p.points, level: p.level, title: `${p.levelInto}/${p.levelNeed}` }),
           h('div', { className: 'cq-sub', style: { marginTop: '3px' } }, `${t('nextLevel')} ${p.levelNeed - p.levelInto} ${t('points')}`),
         ),
         h('span', { className: 'cq-chip' }, `${t('unlocked')} ${p.unlocked}/${p.total}`),
@@ -1520,10 +1621,10 @@ function markFilmSeen(id) {
 }
 
 const FILM_SPEC = {
-  common: { count: 26, dur: 3.6, spread: 0.55, size: 1 },
-  rare: { count: 52, dur: 4.2, spread: 0.75, size: 1.15 },
-  epic: { count: 84, dur: 4.8, spread: 0.95, size: 1.3 },
-  legendary: { count: 140, dur: 5.6, spread: 1.15, size: 1.5 },
+  common: { count: 26, dur: 1.45, spread: 0.55, size: 1 },
+  rare: { count: 52, dur: 1.6, spread: 0.75, size: 1.15 },
+  epic: { count: 84, dur: 1.75, spread: 0.95, size: 1.3 },
+  legendary: { count: 140, dur: 1.95, spread: 1.15, size: 1.5 },
 };
 
 const CODE_CHARS = '{}[]()<>/\\=+-*&|!?$#0123456789abcdef'.split('');
@@ -1709,10 +1810,10 @@ const FILM_DRAW = {
 
 const FILM_PHASES = [
   ['glow', 0],
-  ['burst', 0.12],
-  ['name', 0.34],
-  ['desc', 0.62],
-  ['settle', 0.86],
+  ['burst', 0.10],
+  ['name', 0.20],
+  ['desc', 0.46],
+  ['settle', 0.72],
 ];
 
 /** progress → 相位名。NaN/空输入安全地回到第一相位（别让 rAF 时间戳缺失时抛异常）。 */
@@ -1812,7 +1913,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
       applyPhase(progress);
       if (ctx) {
         ctx.clearRect(0, 0, w, h);
-        const burstAt = spec.dur * 0.12;
+        const burstAt = spec.dur * 0.1;
         if (elapsed >= burstAt) {
           for (const p of particles) {
             if (p.life <= 0) continue;
@@ -1870,6 +1971,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
       h(
         'div',
         { className: 'cq-filmcenter' },
+        h('span', { className: 'cq-filmflash' }),
         h('div', { className: 'cq-filmhalo' }),
         h(
           'div',
@@ -1889,6 +1991,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
             : null,
           h('span', { style: { display: artUrl ? 'none' : 'flex' } }, item.icon || '🏆'),
         ),
+        h('span', { className: 'cq-filmring' }),
       ),
       h(
         'div',
@@ -2045,30 +2148,212 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
       return out;
     }
 
-    function Sparkline({ values, width, height, pulse }) {
+    /**
+     * 数字滚动：目标值变化时从当前显示值缓动过去，而不是瞬间替换。
+     * 首帧直接显示目标值（测试环境 effect 不跑），避免闪 0；系统开启
+     * prefers-reduced-motion 时同样直接落到目标。
+     */
+    function CountUp({ value, format = fmtTokens, duration = 850, className = '' }) {
+      const target = Number(value) || 0;
+      const [shown, setShown] = useState(target);
+      const shownRef = useRef(target);
+      useEffect(() => {
+        const from = shownRef.current;
+        if (from === target) {
+          if (shown !== target) setShown(target);
+          return undefined;
+        }
+        const reduce = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+          && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) {
+          shownRef.current = target;
+          setShown(target);
+          return undefined;
+        }
+        const clock = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+        const started = clock();
+        let raf = 0;
+        const tick = (now) => {
+          // 个别 WebView 的 rAF 时间戳会缺失；用墙钟补上，避免 progress 变 NaN。
+          const at = Number.isFinite(now) ? now : clock();
+          const progress = Math.min(1, Math.max(0, (at - started) / duration));
+          const eased = 1 - (1 - progress) ** 3;
+          const next = from + (target - from) * eased;
+          shownRef.current = next;
+          setShown(next);
+          if (progress < 1) raf = requestAnimationFrame(tick);
+          else {
+            shownRef.current = target;
+            setShown(target);
+          }
+        };
+        raf = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(raf);
+      }, [target, duration]);
+      return h('span', { className: className ? `cq-countup ${className}` : 'cq-countup' }, format(Math.round(shown)));
+    }
+
+    /**
+     * 等级跳变：只认「变高」，首帧/降级和只改标题都不弹。用 layout effect
+     * 在绘制前把事件塞进去，避免新等级先闪一帧再开始滚。
+     */
+    function useLevelUp(level, title) {
+      const [event, setEvent] = useState(null);
+      const prev = useRef(null);
+      useBeforePaint(() => {
+        const next = Number(level) || 0;
+        if (!prev.current) {
+          if (next > 0) prev.current = { level: next, title: title || '' };
+          return;
+        }
+        const before = prev.current;
+        if (next > before.level) {
+          setEvent({
+            id: `${next}-${Date.now()}`,
+            from: before.level,
+            to: next,
+            fromTitle: before.title,
+            at: Date.now(),
+          });
+        }
+        prev.current = { level: next, title: title || '' };
+      }, [level, title]);
+      useEffect(() => {
+        if (!event) return undefined;
+        const timer = window.setTimeout(() => setEvent(null), 3600);
+        return () => window.clearTimeout(timer);
+      }, [event]);
+      return event;
+    }
+
+    /** The level itself: old number rolls up and out, new one scales down into place. */
+    function LevelRoll({ level, from, active, prefix = 'Lv.' }) {
+      const now = Number(level) || 0;
+      if (!active || from == null || Number(from) === now) {
+        return h('span', { className: 'cq-levelroll static' }, `${prefix}${now}`);
+      }
+      return h(
+        'span',
+        { className: 'cq-levelroll' },
+        h('span', { className: 'cq-levelrollold', 'aria-hidden': 'true' }, `${prefix}${from}`),
+        h('span', { className: 'cq-levelrollnew' }, `${prefix}${now}`),
+      );
+    }
+
+    /**
+     * Title changes are rare and always happen on a level boundary. The new
+     * title types itself in character by character; the old layer dissolves,
+     * including the tail that has no counterpart in the new title.
+     */
+    function TitleMorph({ title, previous, active }) {
+      const next = String(title || '');
+      const before = String(previous || '');
+      if (!active || !before || before === next) {
+        return h('span', { className: 'cq-titletext' }, next);
+      }
+      const chars = (value, cls, delay) => [...value].map((ch, i) => h(
+        'span',
+        {
+          key: `${cls}${i}`,
+          className: `cq-titlechar ${cls}`,
+          style: { animationDelay: `${delay + i * 36}ms` },
+        },
+        ch === ' ' ? '\u00a0' : ch,
+      ));
+      return h(
+        'span',
+        { className: 'cq-titlemorph', 'aria-label': next },
+        h('span', { className: 'cq-titleold', 'aria-hidden': 'true' }, chars(before, 'out', 0)),
+        h('span', { className: 'cq-titlenew', 'aria-hidden': 'true' }, chars(next, 'in', 110)),
+      );
+    }
+
+    /** Big "LEVEL UP!" hit that lands before the in-place level roll. */
+    function LevelUpBanner({ event }) {
+      if (!event) return null;
+      return h(
+        'div',
+        { className: 'cq-levelup', role: 'status', 'aria-live': 'polite', 'aria-label': `Level up to ${event.to}` },
+        h('span', { className: 'cq-levelupglow' }),
+        h('span', { className: 'cq-levelupword' }, 'LEVEL UP!'),
+        h('span', { className: 'cq-levelupnum' }, `Lv.${event.to}`),
+      );
+    }
+
+    function Sparkline({ values, width, height, pulse, animated }) {
       const max = Math.max(1, ...values);
       const step = values.length > 1 ? width / (values.length - 1) : width;
-      const points = values.map((value, index) => {
-        const x = index * step;
-        const y = height - 2 - (value / max) * (height - 4);
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-      });
-      const last = points.length ? points[points.length - 1].split(',').map(Number) : [0, 0];
+      const points = values.map((value, index) => ({
+        x: index * step,
+        y: height - 2 - (value / max) * (height - 4),
+      }));
+      const linePath = smoothSparkPath(points, height);
+      const areaPath = `${linePath} L${width},${height} L0,${height} Z`;
+      const last = points.length ? points[points.length - 1] : { x: 0, y: height };
+      const uid = `${width}x${height}`;
       return h(
         'svg',
-        { className: 'cq-spark', width, height, viewBox: `0 0 ${width} ${height}`, preserveAspectRatio: 'none' },
-        h('polygon', { points: `0,${height} ${points.join(' ')} ${width},${height}`, fill: 'rgba(77,107,254,.16)' }),
-        h('polyline', {
-          points: points.join(' '),
+        { className: `cq-spark${animated ? ' cq-spark-anim' : ''}`, width, height, viewBox: `0 0 ${width} ${height}`, preserveAspectRatio: 'none' },
+        h(
+          'defs',
+          null,
+          h(
+            'linearGradient',
+            { id: `cqSparkFill-${uid}`, x1: '0', y1: '0', x2: '0', y2: '1' },
+            h('stop', { offset: '0%', stopColor: '#4d6bfe', stopOpacity: '.4' }),
+            h('stop', { offset: '58%', stopColor: '#7c5cff', stopOpacity: '.2' }),
+            h('stop', { offset: '100%', stopColor: '#a855f7', stopOpacity: '.03' }),
+          ),
+          h(
+            'linearGradient',
+            { id: `cqSparkStroke-${uid}`, x1: '0', y1: '0', x2: '1', y2: '0' },
+            h('stop', { offset: '0%', stopColor: '#4d6bfe' }),
+            h('stop', { offset: '58%', stopColor: '#8b5cf6' }),
+            h('stop', { offset: '100%', stopColor: '#22d3ee' }),
+          ),
+        ),
+        h('path', { className: 'cq-sparkarea', d: areaPath, fill: `url(#cqSparkFill-${uid})` }),
+        h('path', {
+          className: 'cq-sparkline',
+          d: linePath,
           pathLength: 1,
           fill: 'none',
-          stroke: '#4d6bfe',
+          stroke: `url(#cqSparkStroke-${uid})`,
           strokeWidth: 1.6,
           strokeLinejoin: 'round',
           strokeLinecap: 'round',
         }),
-        h('circle', { cx: last[0], cy: last[1], r: 2.1, className: `cq-sparkdot${pulse ? ' on' : ''}` }),
+        h('circle', { className: 'cq-sparkhalo', cx: last.x, cy: last.y, r: 5.4 }),
+        animated
+          ? h(
+              'circle',
+              { className: 'cq-sparkcomet', r: 2.4 },
+              h('animateMotion', { dur: '6.5s', repeatCount: 'indefinite', path: linePath }),
+            )
+          : null,
+        h('circle', { cx: last.x, cy: last.y, r: 2.1, className: `cq-sparkdot${pulse ? ' on' : ''}` }),
       );
+    }
+
+    /** Catmull-Rom points -> cubic path; keeps the mini chart soft without overshooting the box. */
+    function smoothSparkPath(points, height) {
+      if (!points.length) return '';
+      const fmt = (value) => value.toFixed(1);
+      if (points.length === 1) return `M${fmt(points[0].x)},${fmt(points[0].y)}`;
+      const clamp = (value) => Math.max(1, Math.min(height - 1, value));
+      let d = `M${fmt(points[0].x)},${fmt(points[0].y)}`;
+      for (let i = 0; i < points.length - 1; i += 1) {
+        const p0 = points[i - 1] || points[i];
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        const p3 = points[i + 2] || p2;
+        const c1x = p1.x + (p2.x - p0.x) / 6;
+        const c1y = clamp(p1.y + (p2.y - p0.y) / 6);
+        const c2x = p2.x - (p3.x - p1.x) / 6;
+        const c2y = clamp(p2.y - (p3.y - p1.y) / 6);
+        d += ` C${fmt(c1x)},${fmt(c1y)} ${fmt(c2x)},${fmt(c2y)} ${fmt(p2.x)},${fmt(p2.y)}`;
+      }
+      return d;
     }
 
     const HUD_KEY = 'dsh-codequest.hud';
@@ -2415,10 +2700,10 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
       }
     }
 
-    /** 卡片动效：镭射 / 流动 / 炫彩，各自独立开关，存在 Host 的 prefs.hudFx 里。 */
-    const HUD_FX_KEYS = ['laser', 'flow', 'color'];
-    const HUD_FX_DEFAULT = Object.freeze({ laser: true, flow: true, color: true });
-    const HUD_FX_LABELS = { laser: 'hudFxLaser', flow: 'hudFxFlow', color: 'hudFxColor' };
+    /** 卡片动效：镭射 / 流动 / 炫彩 / 曲线，各自独立开关，存在 Host 的 prefs.hudFx 里。 */
+    const HUD_FX_KEYS = ['laser', 'flow', 'color', 'line'];
+    const HUD_FX_DEFAULT = Object.freeze({ laser: true, flow: true, color: true, line: true });
+    const HUD_FX_LABELS = { laser: 'hudFxLaser', flow: 'hudFxFlow', color: 'hudFxColor', line: 'hudFxLine' };
 
     function hudFx() {
       const prefs = questStore.data && questStore.data.prefs;
@@ -2611,13 +2896,87 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
       return h('span', { className: 'cq-float' }, `+${fmtTokens(entry.amount)}`);
     }
 
+    /**
+     * What the progress bar should do for a point change: a real gain starts from
+     * the old fill and leaves a ghost; every other change snaps to the new fill.
+     */
+    function levelBarChange(prev, next) {
+      if (!prev) return { from: next.pct, ghost: null, gained: false };
+      const gained =
+        next.points > prev.points &&
+        next.level === prev.level &&
+        next.pct > prev.pct;
+      return gained
+        ? { from: prev.pct, ghost: prev.pct, gained: true }
+        : { from: next.pct, ghost: null, gained: false };
+    }
+
+    /**
+     * Level progress bar. A point gain first leaves the old fill as a blurred
+     * ghost, then after a short beat the solid fill grows to the new width.
+     */
+    function HudLevelBar({ pct, points, level, title }) {
+      const [width, setWidth] = useState(pct);
+      const [ghost, setGhost] = useState(null);
+      const [growing, setGrowing] = useState(false);
+      const last = useRef({ pct, points, level });
+      const seq = useRef(0);
+
+      useEffect(() => {
+        const prev = last.current;
+        last.current = { pct, points, level };
+        const change = levelBarChange(prev, { pct, points, level });
+        if (!change.gained) {
+          setWidth(change.from);
+          setGhost(null);
+          setGrowing(false);
+          return undefined;
+        }
+        seq.current += 1;
+        setGhost({ pct: change.ghost, id: seq.current });
+        setWidth(change.from);
+        setGrowing(false);
+        // 先把旧进度停一下，再让实条带着过渡追上去；虚影同时淡出。
+        const grow = window.setTimeout(() => setGrowing(true), 300);
+        const move = window.setTimeout(() => setWidth(pct), 340);
+        const settle = window.setTimeout(() => setGrowing(false), 1500);
+        const clear = window.setTimeout(() => setGhost(null), 1750);
+        return () => {
+          window.clearTimeout(grow);
+          window.clearTimeout(move);
+          window.clearTimeout(settle);
+          window.clearTimeout(clear);
+        };
+      }, [pct, points, level]);
+
+      return h(
+        'div',
+        { className: 'cq-levelbar', title },
+        ghost ? h('i', { key: ghost.id, className: 'cq-levelghost', style: { width: `${ghost.pct}%` } }) : null,
+        ghost ? h('b', { key: `m${ghost.id}`, className: 'cq-levelmark', style: { left: `${ghost.pct}%` } }) : null,
+        h('i', {
+          className: `cq-levelfill${growing ? ' growing' : ''}`,
+          style: {
+            width: `${width}%`,
+            transition: growing ? 'width .9s cubic-bezier(.22,.9,.24,1)' : 'none',
+          },
+        }, h('span', { className: 'cq-levelshine' })),
+        growing
+          ? h('span', {
+              className: 'cq-levelhead',
+              style: { left: `${width}%`, transition: 'left .9s cubic-bezier(.22,.9,.24,1)' },
+            })
+          : null,
+      );
+    }
+
     /** Floating usage curve: a small pill by default, expandable, hideable, draggable. */
     function QuestHud(props) {
       const t = (props && props.t) || pluginT;
       const { data, live, float } = useQuestStore();
       const mode = readHudMode();
       const fx = hudFx();
-      const cardClass = `cq-hudcard${fx.laser ? ' cq-fx-laser' : ''}${fx.flow ? ' cq-fx-flow' : ''}${fx.color ? ' cq-fx-color' : ''}`;
+      const cardClass = `cq-hudcard${fx.laser ? ' cq-fx-laserhover' : ''}${fx.flow ? ' cq-fx-flow' : ''}${fx.color ? ' cq-fx-color' : ''}`;
       const drag = useHudDrag();
       const [floats, setFloats] = useState([]);
       const [updateLatest, setUpdateLatest] = useState(null);
@@ -2660,6 +3019,10 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
         return () => root.classList.remove('cq-has-bar');
       }, [mode]);
 
+      const levelNow = live ? live.level : (data && data.progress ? data.progress.level : 0);
+      const titleNow = live ? live.title : (data && data.progress ? data.progress.title : '');
+      const levelEvent = useLevelUp(levelNow, titleNow);
+
       if (mode === 'hidden' || !data) return null;
 
       const p = live
@@ -2699,6 +3062,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
           onDone: () => setFloats((list) => list.filter((item) => item.id !== entry.id)),
         }),
       );
+      const levelBanner = levelEvent ? h(LevelUpBanner, { key: levelEvent.id, event: levelEvent }) : null;
       const dismissUpdate = () => {
         if (updateLatest) writeUpdateDismissed(updateLatest);
         setUpdateLatest(null);
@@ -2754,19 +3118,30 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
               writeHudMode('open');
             },
           },
+          levelBanner,
           h(
             'div',
             { className: 'cq-barleft' },
             liveDot(' bar'),
             h('img', { src: avatar, alt: '' }),
-            h('b', null, `Lv.${p.level}`),
-            h('span', { className: 'cq-bartitle' }, p.title),
+            h('b', null, h(LevelRoll, {
+              key: levelEvent ? levelEvent.id : 'lv',
+              level: p.level,
+              from: levelEvent && levelEvent.from,
+              active: Boolean(levelEvent),
+            })),
+            h('span', { className: `cq-bartitle${levelEvent ? ' cq-levelup-active' : ''}` }, h(TitleMorph, {
+              key: levelEvent ? levelEvent.id : 'title',
+              title: p.title,
+              previous: levelEvent && levelEvent.fromTitle,
+              active: Boolean(levelEvent),
+            })),
           ),
           h(
             'div',
             { className: 'cq-barmid' },
-            h('span', { className: 'cq-barnum' }, `${t('todayTokens')} ${fmtTokens(tokensToday)}`),
-            h('span', { className: 'cq-barspark' }, h(Sparkline, { values, width: 240, height: 14, pulse: working })),
+            h('span', { className: 'cq-barnum' }, `${t('todayTokens')} `, h(CountUp, { value: tokensToday, format: fmtTokens })),
+            h('span', { className: 'cq-barspark' }, h(Sparkline, { values, width: 240, height: 14, pulse: working, animated: fx.line })),
           ),
           h(
             'div',
@@ -2807,6 +3182,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
           h(
             'div',
             { className: `cq-hudpill${working ? ' live' : ''}` },
+            levelBanner,
             h(
               'button',
               {
@@ -2827,9 +3203,14 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
               },
               liveDot(),
               h('img', { src: avatar, alt: '' }),
-              h('b', null, `Lv.${p.level}`),
-              h('span', { key: `n${tokensToday}`, className: `cq-hudnum${working ? ' tick' : ''}` }, fmtTokens(tokensToday)),
-              h(Sparkline, { values, width: 40, height: 15, pulse: working }),
+              h('b', null, h(LevelRoll, {
+                key: levelEvent ? levelEvent.id : 'lv',
+                level: p.level,
+                from: levelEvent && levelEvent.from,
+                active: Boolean(levelEvent),
+              })),
+              h(CountUp, { value: tokensToday, format: fmtTokens, className: `cq-hudnum${working ? ' tick' : ''}` }),
+              h(Sparkline, { values, width: 40, height: 15, pulse: working, animated: fx.line }),
             ),
             h('button', { type: 'button', className: 'cq-hudx', onClick: () => writeHudMode('open'), title: t('hudOpen') }, '↓'),
             h('button', { type: 'button', className: 'cq-hudx', onClick: hide, title: t('hudHide') }, '✕'),
@@ -2841,6 +3222,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
       return h(
         'div',
         { className: 'cq-hud', style: drag.style },
+        levelBanner,
         updateTip,
         h(
           'div',
@@ -2856,8 +3238,21 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
             h(
               'div',
               { style: { minWidth: 0, flex: 1 } },
-              h('div', { className: 'cq-hudtitle' }, liveDot(' inline'), `Lv.${p.level} ${p.title}`),
-              h('div', { className: 'cq-hudsub' }, `${t('todayTokens')} ${fmtTokens(tokensToday)} · ${t('streak')} ${streak || 0}`),
+              h('div', { className: `cq-hudtitle${levelEvent ? ' cq-levelup-active' : ''}` }, liveDot(' inline'),
+                h(LevelRoll, {
+                  key: levelEvent ? levelEvent.id : 'lv',
+                  level: p.level,
+                  from: levelEvent && levelEvent.from,
+                  active: Boolean(levelEvent),
+                }),
+                ' ',
+                h(TitleMorph, {
+                  key: levelEvent ? levelEvent.id : 'title',
+                  title: p.title,
+                  previous: levelEvent && levelEvent.fromTitle,
+                  active: Boolean(levelEvent),
+                })),
+              h('div', { className: 'cq-hudsub' }, `${t('todayTokens')} `, h(CountUp, { value: tokensToday, format: fmtTokens }), ` · ${t('streak')} `, h(CountUp, { value: streak || 0, format: fmtInt })),
             ),
             // 方框：打开 CodeQuest 整页。
             h(
@@ -2896,14 +3291,14 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
               '✕',
             ),
           ),
-          h(Sparkline, { values, width: 240, height: 44, pulse: working }),
+          h(Sparkline, { values, width: 240, height: 44, pulse: working, animated: fx.line }),
           h(
             'div',
             { className: 'cq-hudrow' },
             h('span', null, `${t('unlocked')} ${p.unlocked}/${p.total}`),
             h('span', null, `${p.points} ${t('points')}`),
           ),
-          h('div', { className: 'cq-levelbar' }, h('i', { style: { width: `${pct}%` } })),
+          h(HudLevelBar, { pct, points: p.points, level: p.level, title: `${p.levelInto}/${p.levelNeed}` }),
           h('div', { className: 'cq-hudsub', style: { marginTop: '5px' } }, `${t('nextLevel')} ${Math.max(0, p.levelNeed - p.levelInto)} ${t('points')}`),
           h('div', { className: 'cq-floats' }, bubbles),
         ),
@@ -5161,6 +5556,9 @@ function LeaderboardTab({ t, data }) {
         AchievementCard,
         AchievementDetail,
         UnlockFilm,
+        LevelRoll,
+        TitleMorph,
+        LevelUpBanner,
         CodeQuestPage,
         CodeQuestHeaderAction,
         CodeQuestGlyph,
@@ -5208,7 +5606,7 @@ function LeaderboardTab({ t, data }) {
         dismiss: writeUpdateDismissed,
       },
       /** Test seam: floating-card visibility rules (they must survive a restart). */
-      __hud: { readHudMode, writeHudMode, hudPref, hudFx, clampHudPos, canDrag: canStartHudDrag },
+      __hud: { readHudMode, writeHudMode, hudPref, hudFx, levelBarChange, smoothSparkPath, clampHudPos, canDrag: canStartHudDrag },
       /** Test seam: the unlock film's particle system and NEW-badge bookkeeping. */
       __film: {
         spawn: spawnFilmParticles,

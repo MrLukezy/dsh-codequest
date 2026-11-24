@@ -112,19 +112,33 @@ const tree = mod.__views.QuestHud({ t: (key) => key });
 const fxCard = find(tree, (node) => String(node.props.className || '').includes('cq-hudcard'));
 assert(fxCard, 'the expanded card must render');
 const fxClass = String(fxCard.props.className);
-for (const name of ['cq-fx-laser', 'cq-fx-flow', 'cq-fx-color']) {
+for (const name of ['cq-fx-laserhover', 'cq-fx-flow', 'cq-fx-color']) {
   assert(fxClass.includes(name), `the card should carry ${name} by default, got ${fxClass}`);
 }
 mod.__store.data.prefs.hudFx = { laser: false, flow: true, color: false };
 const mixedFxCard = find(mod.__views.QuestHud({ t: (key) => key }), (node) => String(node.props.className || '').includes('cq-hudcard'));
 const mixedClass = String(mixedFxCard.props.className);
 assert(mixedClass.includes('cq-fx-flow'), 'the flow effect must stay on when selected');
-assert(!mixedClass.includes('cq-fx-laser') && !mixedClass.includes('cq-fx-color'), 'turned-off effects must not render');
+assert(!mixedClass.includes('cq-fx-laserhover') && !mixedClass.includes('cq-fx-color'), 'turned-off effects must not render');
+// The curve is its own switch: the SVG keeps its gradient, but loses the comet/draw animation.
+assert(find(tree, (node) => String(node.props.className || '').includes('cq-spark-anim')), 'the curve animation must default on');
+mod.__store.data.prefs.hudFx = { laser: false, flow: false, color: false, line: false };
+const plainCurve = mod.__views.QuestHud({ t: (key) => key });
+assert(!find(plainCurve, (node) => String(node.props.className || '').includes('cq-spark-anim')), 'the curve switch must stop its animation');
 mod.__store.data.prefs.hudFx = { laser: false, flow: false, color: false };
 const plainFxCard = find(mod.__views.QuestHud({ t: (key) => key }), (node) => String(node.props.className || '').includes('cq-hudcard'));
 assert(!String(plainFxCard.props.className).includes('cq-fx-'), 'all effects off must leave a clean card');
 delete mod.__store.data.prefs.hudFx;
-assert(String(fxCard.props.className).includes('cq-fx-laser'), 'the earlier card snapshot must keep its classes');
+assert(String(fxCard.props.className).includes('cq-fx-laserhover'), 'the earlier card snapshot must keep its classes');
+
+// The progress bar renders its fill at the current percentage; point gains are
+// animated by HudLevelBar, the initial render must not start from zero.
+const levelBar = find(tree, (node) => String(node.props.className || '') === 'cq-levelbar');
+assert(levelBar, 'the card must render its level progress bar');
+const levelFill = find(levelBar, (node) => String(node.props.className || '').includes('cq-levelfill'));
+assert(levelFill, 'the progress bar must render its solid fill');
+assert(String(levelFill.props.style.width) === '40%', `the fill should start at 60/150 = 40%, got ${levelFill.props.style.width}`);
+assert(find(levelFill, (node) => String(node.props.className || '') === 'cq-levelshine'), 'the fill must carry its continuous moving shine');
 
 const header = find(tree, (node) => String(node.props.className || '').includes('cq-hudhead'));
 assert(header, 'the expanded card must render a title bar');
@@ -167,6 +181,7 @@ const liveSpark = find(livePill, (node) => String(node.props.className || '').in
 assert(liveSpark && String(liveSpark.props.className).includes('on'), 'the sparkline end dot must pulse while working');
 const liveNum = find(livePill, (node) => String(node.props.className || '').includes('cq-hudnum'));
 assert(liveNum && String(liveNum.props.className).includes('tick'), 'the token counter should tick on a gain');
+assert(find(livePill, (node) => String(node.props.className || '').includes('cq-countup')), 'the token counter must render as a rolling number');
 
 // Twelve seconds later the gain is stale: the dot goes back to idle.
 mod.__store.float = { id: 7, amount: 1200, at: Date.now() - 13000 };
