@@ -1239,7 +1239,7 @@ html.cq-has-bar #root{padding-bottom:var(--cq-bar-h,40px);box-sizing:border-box}
 /* 不压黑整页：只把身后的界面虚化，舞台是一块透明排版区，粒子画在整屏 canvas 上。 */
 .cq-filmstage{position:relative;width:min(430px,86vw);height:min(560px,82vh);overflow:visible;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
-.cq-filmcanvas{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none}
+.cq-filmcanvas{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;transition:opacity .22s ease}
 /* 光晕和徽章同处一层，保证任何内容高度下都同心。 */
 .cq-filmcenter{position:relative;display:flex;align-items:center;justify-content:center}
 .cq-filmhalo{position:absolute;left:50%;top:50%;width:260px;height:260px;margin:-130px 0 0 -130px;border-radius:50%;
@@ -1250,6 +1250,9 @@ html.cq-has-bar #root{padding-bottom:var(--cq-bar-h,40px);box-sizing:border-box}
 .cq-filmstage.p-burst .cq-filmhalo{opacity:.75;transform:scale(1.3)}
 .cq-filmstage.p-name .cq-filmhalo,.cq-filmstage.p-desc .cq-filmhalo,
 .cq-filmstage.p-settle .cq-filmhalo{opacity:.9;transform:scale(1)}
+/* 播放结束：粒子和光晕一起收掉，只留下解锁结果卡片。 */
+.cq-filmstage.done .cq-filmcanvas{opacity:0}
+.cq-filmstage.done .cq-filmhalo{opacity:0;transition:opacity .22s ease}
 /* 盖章：从上方带着重影砸下来，压扁、回弹，最后定住。 */
 .cq-filmstage.p-name .cq-filmcenter{animation:cqFilmShake .22s cubic-bezier(.2,.7,.2,1) .06s}
 @keyframes cqFilmShake{0%,100%{transform:translate(0,0)}22%{transform:translate(0,3px)}42%{transform:translate(-2px,1px)}64%{transform:translate(2px,-1px)}82%{transform:translate(-1px,0)}}
@@ -1875,6 +1878,11 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
     const settle = () => {
       if (settled) return;
       settled = true;
+      // 粒子是实时画在 canvas 上的；结束时不擦掉会留下最后一帧，像卡住的圆环。
+      if (ctx) {
+        if (typeof ctx.setTransform === 'function') ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
       setPhase('settle');
       setFinished(true);
       if (doneRef.current) doneRef.current();

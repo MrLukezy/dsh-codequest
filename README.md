@@ -19,7 +19,7 @@ https://raw.githubusercontent.com/MrLukezy/dsh-code-review/main/market/index.jso
 **方式二：直接从 GitHub 装**
 
 ```
-plugin_manager { action: "install_bundle", target: "git+https://github.com/MrLukezy/dsh-codequest.git#v0.11.1" }
+plugin_manager { action: "install_bundle", target: "git+https://github.com/MrLukezy/dsh-codequest.git#v0.11.2" }
 ```
 
 **方式三：本地目录**
@@ -115,6 +115,7 @@ CodeQuest 现在是一个**独立整页**，挂在 `main` 面板上（和「插�
 - **12 个分类 12 种粒子形态**：代码与工具是代码雨、时间是星尘、文本性格是飘起来的字、职场是方块、翻车现场是向外炸开的短线……同一个粒子池换一支笔。
 - **4 档稀有度 4 档强度**：`common / rare / epic / legendary` 分别 26 / 52 / 84 / 140 颗粒子，时长压到 1.45–1.95 秒；徽章在 20% 进度就落下，不再让人干等。
 - **点空白关闭**：点任意空白处或按 `Esc` 直接关闭（同时记已看）；点徽章、文字或按钮不会误关。播完后出现「关闭」「看详情」，详情页底部有「重播解锁动画」。
+- **播完即收**：短片结束时清空 canvas 粒子并淡出光晕，只留下解锁结果卡片，不会把最后一帧的圆环冻在背景里。
 - **已看记忆**：记录在 `localStorage['dsh-codequest.film-seen']`，点开短片（点整张 `NEW` 卡也算）就立刻写已看并摘掉 `NEW!`，不用等播完；首次运行只保留最近 3 枚带 `NEW`，其余按已看处理，不会一屏全是新。
 - **尊重减少动态效果**：系统开了 `prefers-reduced-motion: reduce` 时不生成粒子、不播放盖章/冲击环/闪光，只留文字与光晕。
 - **不会卡在空白舞台**：相位同时用 `requestAnimationFrame` 和墙钟定时器推进——rAF 时间戳缺失、后台标签页被节流、甚至 canvas 拿不到 2D 上下文时，短片也会走到 `settle`，徽章/名称照常出现；图标文件缺失时自动退回 emoji。
