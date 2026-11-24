@@ -317,4 +317,67 @@ if (!merged.has('old') || !merged.has('new')) throw new Error('mark must merge w
 console.log('unlock film: NEW baseline + persistence ok');
 
 
+// --- 成就卡：点 NEW 卡先播短片，顺手摘掉 NEW -------------------------------
+// 以前点整卡只开详情：NEW! 一直挂着，解锁动画也不会自己播。
+const cardProbe = {
+  id: 'card_probe',
+  name: '探针成就',
+  desc: '',
+  cond: '',
+  category: 'code',
+  rarity: 'common',
+  points: 10,
+  unlockedAt: 1,
+  ratio: 1,
+  value: 1,
+  target: 1,
+  icon: '🎯',
+};
+let played = 0;
+let opened = 0;
+const newCard = views.AchievementCard({
+  item: cardProbe,
+  t: (key) => key,
+  isNew: true,
+  onOpen: () => { opened += 1; },
+  onPlay: () => { played += 1; },
+});
+if (newCard.props['data-cq-ach'] !== 'card_probe') throw new Error('the card must expose its id for locating');
+newCard.props.onClick({ stopPropagation() {} });
+if (played !== 1 || opened !== 0) throw new Error(`clicking a NEW card must play the film (played=${played}, opened=${opened})`);
+newCard.props.onKeyDown({ key: 'Enter', preventDefault() {} });
+if (played !== 2 || opened !== 0) throw new Error('Enter on a NEW card must play the film too');
+const watchedCard = views.AchievementCard({
+  item: cardProbe,
+  t: (key) => key,
+  isNew: false,
+  onOpen: () => { opened += 1; },
+  onPlay: () => { played += 1; },
+});
+watchedCard.props.onClick({ stopPropagation() {} });
+if (opened !== 1 || played !== 2) throw new Error('a card that is not NEW must still open its detail');
+if (watchedCard.props.className.includes('cq-locate')) throw new Error('an unfocused card must not be highlighted');
+const locatedCard = views.AchievementCard({
+  item: cardProbe,
+  t: (key) => key,
+  focused: true,
+  onOpen: () => {},
+  onPlay: () => {},
+});
+if (!locatedCard.props.className.includes('cq-locate')) throw new Error('the located card must carry the highlight class');
+console.log('achievement card: NEW plays film, watched card opens detail, locate highlight');
+
+// --- 解锁气泡：落到成就页并定位到那枚成就 ---------------------------------
+// 只切页签是不够的：卡片可能在墙的最下面，用户还得自己找。
+const nav = clientModule.__nav;
+nav.takeTab();
+nav.takeFocus();
+nav.openToast('card_probe');
+if (selectedPanels[selectedPanels.length - 1] !== 'codequest') {
+  throw new Error('the toast click must open the codequest panel');
+}
+if (nav.takeTab() !== 'achievements') throw new Error('the toast click must land on the achievements tab');
+if (nav.takeFocus() !== 'card_probe') throw new Error('the toast click must locate the unlocked card');
+console.log('unlock toast: opens the achievements tab and locates the card');
+
 console.log('OK');

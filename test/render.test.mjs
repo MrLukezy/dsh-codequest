@@ -68,6 +68,8 @@ function walk(node, stats = { elements: 0, text: [] }) {
     }
     if (node.type === 'section') stats.sections = (stats.sections || 0) + 1;
     if (node.props && node.props.className === 'cq-card') stats.cards = (stats.cards || 0) + 1;
+    // 定位功能靠这个属性找卡片；少了它，气泡点击只能停在墙顶。
+    if (node.props && node.props['data-cq-ach']) stats.anchors = (stats.anchors || 0) + 1;
     if (node.props && node.props.className === 'cq-card cq-secretcard') stats.secretTiles = (stats.secretTiles || 0) + 1;
     if (node.type === 'img' && node.props && typeof node.props.src === 'string') {
       stats.images = (stats.images || 0) + 1;
@@ -239,6 +241,9 @@ if (wall.sections !== categories.size) {
 const secretItems = payload.achievements.filter((item) => item.secret);
 if (wall.cards !== payload.achievements.length - secretItems.length) {
   throw new Error(`expected ${payload.achievements.length - secretItems.length} cards, got ${wall.cards}`);
+}
+if (wall.anchors !== wall.cards) {
+  throw new Error(`expected a data-cq-ach anchor on every card, got ${wall.anchors || 0}/${wall.cards}`);
 }
 // Every visible card must show real badge art, not the emoji fallback.
 if (wall.images !== wall.cards) {

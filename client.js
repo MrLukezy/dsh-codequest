@@ -883,6 +883,9 @@ function levelArtUrl(level) {
 @keyframes cqLegendary{0%,100%{box-shadow:0 0 0 1px color-mix(in srgb,#f59e0b 42%,transparent),0 6px 22px color-mix(in srgb,#f59e0b 26%,transparent)}50%{box-shadow:0 0 0 1px color-mix(in srgb,#f59e0b 72%,transparent),0 9px 30px color-mix(in srgb,#f59e0b 44%,transparent)}}
 .cq-card.secret::after,.cq-secretcard::after{display:none}
 .cq-card:focus-visible{outline:2px solid color-mix(in srgb,var(--cq-r) 70%,transparent);outline-offset:2px}
+/* 定位高亮：从解锁气泡跳过来时，目标卡片描一圈再扫一道光，用户不用自己找。 */
+.cq-card.cq-locate{outline:2px solid color-mix(in srgb,var(--cq-r) 78%,transparent);outline-offset:2px;border-color:color-mix(in srgb,var(--cq-r) 70%,transparent)}
+.cq-card.cq-locate::after{opacity:1;animation:cqShine 1s ease-out 2}
 .cq-overlay{position:fixed;right:16px;bottom:92px;z-index:60;display:flex;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:none;max-width:min(320px,calc(100vw - 32px))}
 .cq-overlay>*{pointer-events:auto}
 .cq-hud{display:flex;flex-direction:column;align-items:flex-end}
@@ -1037,6 +1040,7 @@ html.cq-has-bar #root{padding-bottom:var(--cq-bar-h,40px);box-sizing:border-box}
 @media (prefers-reduced-motion: reduce){
   .cq-hudlive.on,.cq-hudlive.on::after,.cq-sparkdot.on,.cq-hudnum.tick{animation:none}
   .cq-hudcard .cq-spark polyline{animation:none;stroke-dashoffset:0}
+  .cq-card.cq-locate::after{animation:none}
 }
 .cq-hudcard{width:272px;border:1px solid var(--dsw-alias-border-l2,#e3e6eb);background:color-mix(in srgb,var(--dsw-alias-bg-layer-1,#fff) 94%,transparent);backdrop-filter:blur(12px);border-radius:14px;padding:11px 12px 10px;box-shadow:0 10px 30px rgba(20,26,40,.18)}
 .cq-hudhead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
@@ -1897,7 +1901,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
   );
 }
 
-    function AchievementCard({ item, t, onOpen, isNew, onPlay }) {
+    function AchievementCard({ item, t, onOpen, isNew, onPlay, focused }) {
       const rarity = RARITY[item.rarity] || RARITY.common;
       const locked = !item.unlockedAt;
       // `secret` comes from the Host: most goals stay locked-and-blank until
@@ -1905,20 +1909,29 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
       const secret = locked && (item.secret || item.hidden);
       const pct = Math.round(item.ratio * 100);
       const artUrl = item.art ? `${apiBase()}/icon/${item.art}.webp` : null;
+      /**
+       * NEW 卡点整张也算「打开短片」：短片是解锁那一刻的演出，也是摘掉 NEW
+       * 的唯一入口；把点击让给详情弹窗会让徽标一直挂着，用户还得再点一次。
+       */
+      const activate = () => {
+        if (isNew && onPlay) onPlay();
+        else if (onOpen) onOpen();
+      };
       return h(
         'div',
         {
-          className: `cq-card${locked ? ' locked' : ' on'}${secret ? ' secret' : ''}${locked && !secret && item.ratio >= 0.8 ? ' near' : ''}`,
+          className: `cq-card${locked ? ' locked' : ' on'}${secret ? ' secret' : ''}${locked && !secret && item.ratio >= 0.8 ? ' near' : ''}${focused ? ' cq-locate' : ''}`,
           style: { '--cq-r': secret ? '#8b93a3' : rarity.color },
           'data-r': secret ? 'secret' : item.rarity,
+          'data-cq-ach': item.id,
           role: 'button',
           tabIndex: 0,
           title: secret ? t('secretHint') : `${item.cond}\n${fmtInt(item.value)} / ${fmtInt(item.target)}`,
-          onClick: onOpen,
+          onClick: activate,
           onKeyDown: (event) => {
             if (event.key === 'Enter' || event.key === ' ') {
               event.preventDefault();
-              if (onOpen) onOpen();
+              activate();
             }
           },
         },
@@ -2120,6 +2133,29 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
     function takeRequestedAchievement() {
       const id = requestedAchievement;
       requestedAchievement = null;
+      return id;
+    }
+
+    /**
+     * 「定位到卡片」：解锁气泡点进来时要落到那枚成就的卡片上（滚进视野 +
+     * 高亮），而不是停在墙顶让用户自己翻。和详情分开：详情是弹窗，定位是墙面。
+     * 成就页没挂载时先存着，挂载后 `takeRequestedFocus()` 取走。
+     */
+    let requestedFocus = null;
+
+    function requestFocus(id) {
+      requestedFocus = id || null;
+      requestTab('achievements');
+      try {
+        window.dispatchEvent(new CustomEvent('dsh-codequest:focus', { detail: requestedFocus }));
+      } catch {
+        /* 成就页还没挂载：挂载时读 requestedFocus 就够了 */
+      }
+    }
+
+    function takeRequestedFocus() {
+      const id = requestedFocus;
+      requestedFocus = null;
       return id;
     }
 
@@ -2615,6 +2651,15 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
       );
     }
 
+    /**
+     * 解锁气泡唯一的落点：切到成就页，再定位到那枚成就的卡片。
+     * 页面还没挂载时会先记在 requestedTab / requestedFocus 里，挂载后补上。
+     */
+    function openAchievementFromToast(id) {
+      if (openQuestPage) openQuestPage('achievements');
+      requestFocus(id);
+    }
+
     /** Bottom-right toasts for achievements unlocked while the page is open. */
     function QuestToasts(props) {
       const t = (props && props.t) || pluginT;
@@ -2649,11 +2694,11 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
         setEntries((prev) => prev.filter((entry) => entry.key !== key));
       }, []);
 
-      // 点气泡先切到 CodeQuest 整页，再把自己收掉；自动消失仍走 dismiss。
+      // 点气泡先切到成就页并定位到那枚成就，再把自己收掉；自动消失仍走 dismiss。
       const open = useCallback(
-        (key) => {
-          if (openQuestPage) openQuestPage();
-          dismiss(key);
+        (entry) => {
+          openAchievementFromToast(entry && entry.item ? entry.item.id : null);
+          dismiss(entry.key);
         },
         [dismiss],
       );
@@ -2668,7 +2713,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
             entry,
             t,
             onDone: () => dismiss(entry.key),
-            onOpen: () => open(entry.key),
+            onOpen: () => open(entry),
           }),
         ),
       );
@@ -2792,6 +2837,20 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
     }
 
     /**
+     * 成就卡在 DOM 上的锚点：定位功能只认 `data-cq-ach`，不依赖卡片顺序。
+     * 拿不到 document（SSR / 测试）时安静地返回 null。
+     */
+    function findCardNode(id) {
+      try {
+        if (typeof document === 'undefined' || !document.querySelector) return null;
+        const quoted = String(id).replace(/["\\]/g, '\\$&');
+        return document.querySelector(`[data-cq-ach="${quoted}"]`);
+      } catch {
+        return null;
+      }
+    }
+
+    /**
      * 成就墙。
      *
      * ⚠️ 给 AI：这里的 `reveal` / 破解模式只决定「能不能看见」，不决定「有没有
@@ -2809,20 +2868,87 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
       const revealAll = reveal || crackMode;
       const [film, setFilm] = useState(null);
       const [, bumpSeen] = useState(0);
+      // 从解锁气泡跳进来时要落在哪张卡片上：focusReq 触发滚动，flashId 画高亮。
+      const [focusReq, setFocusReq] = useState(null);
+      const [flashId, setFlashId] = useState(null);
 
       // 从日报点一条解锁进来时，直接打开那枚成就的详情。
       useEffect(() => {
-        const focus = (id) => {
+        const openDetail = (id) => {
           if (!id) return;
           const hit = (data.achievements || []).find((item) => item.id === id);
           if (hit) setDetail(hit);
         };
         const pending = takeRequestedAchievement();
-        if (pending) focus(pending);
-        const onFocus = (event) => focus(event && event.detail);
+        if (pending) openDetail(pending);
+        const onFocus = (event) => openDetail(event && event.detail);
         window.addEventListener('dsh-codequest:achievement', onFocus);
         return () => window.removeEventListener('dsh-codequest:achievement', onFocus);
       }, [data]);
+
+      /**
+       * 「定位到卡片」：只切到成就页还不够——目标可能在墙的最下面。先把搜索和
+       * 分类清成整面墙，让卡片一定在 DOM 里，滚动交给下面那个 effect。
+       */
+      useEffect(() => {
+        const locate = (id) => {
+          if (!id) return;
+          const known = (data.achievements || []).some((item) => item.id === id);
+          if (!known) return;
+          setQuery('');
+          setCategory('all');
+          setFocusReq({ id, at: Date.now() });
+        };
+        const pending = takeRequestedFocus();
+        if (pending) locate(pending);
+        const onLocate = (event) => {
+          // 页面已经挂着时事件当场生效，把「等挂载」那份待办一起清掉，
+          // 否则下一次轮询会拿旧 id 再定位一遍。
+          takeRequestedFocus();
+          locate(event && event.detail);
+        };
+        window.addEventListener('dsh-codequest:focus', onLocate);
+        return () => window.removeEventListener('dsh-codequest:focus', onLocate);
+      }, [data]);
+
+      // 等一帧再滚：刚清掉筛选/切完页签时，目标卡片还没进这一帧的布局。
+      useEffect(() => {
+        if (!focusReq || !focusReq.id) return undefined;
+        const id = focusReq.id;
+        let timer = 0;
+        let raf = 0;
+        let tries = 0;
+        const show = () => {
+          const node = findCardNode(id);
+          // 面板可能还在切换/重排：还没见到卡片就再等一帧（最多 8 帧）。
+          const laidOut = node && (typeof node.getClientRects !== 'function' || node.getClientRects().length > 0);
+          if (!laidOut && tries < 8) {
+            tries += 1;
+            if (typeof window.requestAnimationFrame === 'function') raf = window.requestAnimationFrame(show);
+            return;
+          }
+          if (node && typeof node.scrollIntoView === 'function') {
+            let smooth = true;
+            try {
+              smooth = !(typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+            } catch {
+              smooth = true;
+            }
+            node.scrollIntoView({ block: 'center', inline: 'nearest', behavior: smooth ? 'smooth' : 'auto' });
+          }
+          setFlashId(id);
+          // 高亮只留两秒多，之后回到普通卡片，避免整面墙一直有东西在闪。
+          timer = window.setTimeout(() => {
+            setFlashId(null);
+            setFocusReq(null);
+          }, 2600);
+        };
+        raf = typeof window.requestAnimationFrame === 'function' ? window.requestAnimationFrame(show) : (show(), 0);
+        return () => {
+          if (typeof window.cancelAnimationFrame === 'function') window.cancelAnimationFrame(raf);
+          if (timer) window.clearTimeout(timer);
+        };
+      }, [focusReq]);
 
       /**
        * 点开短片就算「看过」：NEW 不该等短片播完才落盘。提前关闭、切 tab、
@@ -3038,6 +3164,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
                   item,
                   t,
                   isNew: Boolean(item.unlockedAt) && !ensureFilmSeen(data.achievements).has(item.id),
+                  focused: flashId === item.id,
                   onOpen: () => setDetail(item),
                   onPlay: () => openFilm(item),
                 }),
@@ -4741,11 +4868,19 @@ function LeaderboardTab({ t, data }) {
       __i18n: {
         builtin: builtinT,
         t: (key) => pluginT(key),
-        openPage: () => {
+        openPage: (tab) => {
           if (!openQuestPage) return false;
-          openQuestPage();
+          openQuestPage(tab);
           return true;
         },
+      },
+      /** Test seam: 浮层入口的落点（页签 / 定位到哪张卡）。 */
+      __nav: {
+        openToast: openAchievementFromToast,
+        requestFocus,
+        takeFocus: takeRequestedFocus,
+        requestTab,
+        takeTab: takeRequestedTab,
       },
       /** Test seam: floating-card visibility rules (they must survive a restart). */
       __hud: { readHudMode, writeHudMode, hudPref, clampHudPos, canDrag: canStartHudDrag },
