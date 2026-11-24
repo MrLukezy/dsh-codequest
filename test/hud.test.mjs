@@ -108,6 +108,24 @@ mod.__store.data = {
 
 const tree = mod.__views.QuestHud({ t: (key) => key });
 
+// Card effects: all three default on, and each can be removed independently.
+const fxCard = find(tree, (node) => String(node.props.className || '').includes('cq-hudcard'));
+assert(fxCard, 'the expanded card must render');
+const fxClass = String(fxCard.props.className);
+for (const name of ['cq-fx-laser', 'cq-fx-flow', 'cq-fx-color']) {
+  assert(fxClass.includes(name), `the card should carry ${name} by default, got ${fxClass}`);
+}
+mod.__store.data.prefs.hudFx = { laser: false, flow: true, color: false };
+const mixedFxCard = find(mod.__views.QuestHud({ t: (key) => key }), (node) => String(node.props.className || '').includes('cq-hudcard'));
+const mixedClass = String(mixedFxCard.props.className);
+assert(mixedClass.includes('cq-fx-flow'), 'the flow effect must stay on when selected');
+assert(!mixedClass.includes('cq-fx-laser') && !mixedClass.includes('cq-fx-color'), 'turned-off effects must not render');
+mod.__store.data.prefs.hudFx = { laser: false, flow: false, color: false };
+const plainFxCard = find(mod.__views.QuestHud({ t: (key) => key }), (node) => String(node.props.className || '').includes('cq-hudcard'));
+assert(!String(plainFxCard.props.className).includes('cq-fx-'), 'all effects off must leave a clean card');
+delete mod.__store.data.prefs.hudFx;
+assert(String(fxCard.props.className).includes('cq-fx-laser'), 'the earlier card snapshot must keep its classes');
+
 const header = find(tree, (node) => String(node.props.className || '').includes('cq-hudhead'));
 assert(header, 'the expanded card must render a title bar');
 assert(typeof header.props.onDoubleClick === 'function', 'the title bar must handle double-click');

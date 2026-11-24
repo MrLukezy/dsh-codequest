@@ -215,6 +215,19 @@ const cleared = await invoke('/dsh-codequest/config', 'POST', { cloudBase: '' })
 if (cleared.body.base !== freshBase) throw new Error(`empty cloudBase should restore the default, got ${cleared.body.base}`);
 console.log('cloud base (after clearing):', cleared.body.base);
 
+// Card effects live in prefs.hudFx; a partial update must keep the other switches.
+const fxUpdate = await invoke('/dsh-codequest/config', 'POST', { hudFx: { laser: false, color: false } });
+if (fxUpdate.status !== 200) throw new Error(`hudFx config failed: ${fxUpdate.status}`);
+const fxExpected = { laser: false, flow: true, color: false };
+if (JSON.stringify(fxUpdate.body.hudFx) !== JSON.stringify(fxExpected)) {
+  throw new Error(`hudFx update must merge, got ${JSON.stringify(fxUpdate.body.hudFx)}`);
+}
+const fxState = await invoke('/dsh-codequest/state', 'GET');
+if (JSON.stringify(fxState.body.prefs.hudFx) !== JSON.stringify(fxExpected)) {
+  throw new Error(`/state must expose the saved hudFx, got ${JSON.stringify(fxState.body.prefs.hudFx)}`);
+}
+console.log('hud effects:', JSON.stringify(fxState.body.prefs.hudFx));
+
 const leaderboard = await invoke('/dsh-codequest/cloud/leaderboard', 'POST', {});
 console.log('\nleaderboard:', leaderboard.status, JSON.stringify(leaderboard.body).slice(0, 300));
 

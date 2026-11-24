@@ -178,6 +178,9 @@ window.__ModuleLoader__.load({
         filmClose: '关闭',
         filmDetail: '看详情',
         openPage: '打开 CodeQuest',
+        updateTip: '新版本 v{version} 可用',
+        updateGo: '去更新',
+        updateLater: '稍后提醒',
         backToChat: '返回对话',
         shareCard: '分享这张卡片',
         sharing: '生成链接…',
@@ -202,6 +205,11 @@ window.__ModuleLoader__.load({
         hudModePill: '胶囊',
         hudModeOpen: '展开',
         hudModeOff: '关闭',
+        hudFx: '卡片动效',
+        hudFxHint: '给展开的悬浮卡片加一点光效，可单独开关；系统开启「减少动态效果」时会自动停用',
+        hudFxLaser: '镭射',
+        hudFxFlow: '流动',
+        hudFxColor: '炫彩',
         hudBarOpen: '点一下展开卡片',
         hudReset: '复位位置',
         dshAccount: 'DeepSeek 账号',
@@ -430,6 +438,9 @@ window.__ModuleLoader__.load({
         filmClose: 'Close',
         filmDetail: 'Details',
         openPage: 'Open CodeQuest',
+        updateTip: 'v{version} available',
+        updateGo: 'Update',
+        updateLater: 'Later',
         backToChat: 'Back to chat',
         shareCard: 'Share this card',
         sharing: 'Creating link…',
@@ -455,6 +466,11 @@ window.__ModuleLoader__.load({
         hudModePill: 'Pill',
         hudModeOpen: 'Expanded',
         hudModeOff: 'Off',
+        hudFx: 'Card effects',
+        hudFxHint: 'Light effects for the expanded card; toggle each one separately. They turn off automatically with reduced motion.',
+        hudFxLaser: 'Laser',
+        hudFxFlow: 'Flow',
+        hudFxColor: 'Iridescent',
         hudBarOpen: 'Click to expand',
         hudReset: 'Reset position',
         dshAccount: 'DeepSeek account',
@@ -1043,6 +1059,27 @@ html.cq-has-bar #root{padding-bottom:var(--cq-bar-h,40px);box-sizing:border-box}
   .cq-card.cq-locate::after{animation:none}
 }
 .cq-hudcard{width:272px;border:1px solid var(--dsw-alias-border-l2,#e3e6eb);background:color-mix(in srgb,var(--dsw-alias-bg-layer-1,#fff) 94%,transparent);backdrop-filter:blur(12px);border-radius:14px;padding:11px 12px 10px;box-shadow:0 10px 30px rgba(20,26,40,.18)}
+/* 卡片动效：三个开关各自独立，全部只用 CSS，避免 HUD 每帧跑 JS。 */
+@property --cq-flow-angle{syntax:'<angle>';inherits:false;initial-value:0deg}
+.cq-hudcard.cq-fx-flow::before{content:'';position:absolute;inset:0;border-radius:inherit;padding:1px;background:conic-gradient(from var(--cq-flow-angle,0deg),rgba(77,107,254,0) 0deg,#4d6bfe 70deg,#a855f7 140deg,#22d3ee 210deg,rgba(34,211,238,0) 290deg 360deg);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;animation:cqFlowAngle 6.5s linear infinite;pointer-events:none}
+@keyframes cqFlowAngle{to{--cq-flow-angle:360deg}}
+.cq-hudcard.cq-fx-laser{overflow:hidden}
+.cq-hudcard.cq-fx-laser::after{content:'';position:absolute;top:-30%;bottom:-30%;left:-60%;width:26%;background:linear-gradient(90deg,rgba(56,189,248,0),rgba(56,189,248,.32) 42%,rgba(255,255,255,.38) 50%,rgba(217,70,239,.32) 58%,rgba(217,70,239,0));transform:skewX(-16deg);opacity:0;pointer-events:none;animation:cqLaserSweep 7s cubic-bezier(.35,0,.2,1) infinite}
+@keyframes cqLaserSweep{0%,54%{left:-60%;opacity:0}58%{opacity:.72}72%{left:118%;opacity:.46}74%,100%{left:118%;opacity:0}}
+.cq-hudcard.cq-fx-color{animation:cqColorGlow 9s ease-in-out infinite}
+@keyframes cqColorGlow{0%,100%{box-shadow:0 10px 30px rgba(20,26,40,.18),0 0 0 1px rgba(77,107,254,.34),0 0 24px rgba(77,107,254,.26)}33%{box-shadow:0 10px 30px rgba(20,26,40,.18),0 0 0 1px rgba(168,85,247,.38),0 0 26px rgba(168,85,247,.28)}66%{box-shadow:0 10px 30px rgba(20,26,40,.18),0 0 0 1px rgba(34,211,238,.38),0 0 26px rgba(34,211,238,.26)}}
+@media (prefers-reduced-motion: reduce){
+  .cq-hudcard.cq-fx-laser::after{display:none}
+  .cq-hudcard.cq-fx-flow::before,.cq-hudcard.cq-fx-color{animation:none}
+}
+/* 新版本提示：卡片上方的小胶囊，点一下去插件市场更新。 */
+.cq-hudupd{display:flex;align-items:center;gap:7px;max-width:272px;margin-bottom:8px;padding:5px 6px 5px 10px;border:1px solid color-mix(in srgb,#4d6bfe 38%,transparent);border-radius:999px;background:color-mix(in srgb,var(--dsw-alias-bg-layer-1,#fff) 95%,transparent);backdrop-filter:blur(10px);box-shadow:0 8px 22px rgba(20,26,40,.16);font-size:11px;color:var(--dsw-alias-label-primary,#1f2328);animation:cqToastIn .22s ease-out}
+.cq-hudupd span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cq-hudupdgo{border:0;border-radius:999px;background:#4d6bfe;color:#fff;font:inherit;font-size:10.5px;font-weight:700;padding:3px 8px;cursor:pointer;white-space:nowrap}
+.cq-hudupdgo:hover{background:#3d5af0}
+.cq-hudupdx{border:0;background:none;color:var(--dsw-alias-label-secondary,#5b6472);font:inherit;font-size:11px;line-height:1;padding:2px 3px;cursor:pointer}
+.cq-hudupdx:hover{color:var(--dsw-alias-label-primary,#1f2328)}
+.cq-market-flash{outline:2px solid #4d6bfe;outline-offset:2px;border-radius:12px}
 .cq-hudhead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .cq-hudhead img{width:30px;height:30px;border-radius:50%;object-fit:cover;box-shadow:0 0 0 2px color-mix(in srgb,#4d6bfe 40%,transparent)}
 .cq-hudtitle{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -2159,6 +2196,164 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
       return id;
     }
 
+    /**
+     * 新版本提示：HUD 上的小胶囊。市场索引是公开 JSON，浏览器直接取（raw
+     * 允许跨域）；结果缓存 6 小时，断网或限流时静默回落到上一次结果。
+     */
+    const UPDATE_MARKET_URL = 'https://raw.githubusercontent.com/MrLukezy/dsh-code-review/main/market/index.json';
+    const UPDATE_CACHE_KEY = 'dsh-codequest.update-check';
+    const UPDATE_DISMISS_KEY = 'dsh-codequest.update-dismissed';
+    const UPDATE_TTL = 6 * 60 * 60 * 1000;
+
+    /** `0.10.1` → `[0, 10, 1]`; anything with a prerelease suffix is ignored. */
+    function parseVersion(value) {
+      const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(String(value || '').trim());
+      return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
+    }
+
+    /** Semver-ish compare: positive when `a` is newer than `b`, 0 when equal. */
+    function compareVersions(a, b) {
+      const left = parseVersion(a);
+      const right = parseVersion(b);
+      if (!left || !right) return 0;
+      for (let index = 0; index < 3; index += 1) {
+        if (left[index] !== right[index]) return left[index] > right[index] ? 1 : -1;
+      }
+      return 0;
+    }
+
+    /** Newest stable version in a market entry's `versions` list. */
+    function latestVersion(versions) {
+      let best = null;
+      for (const item of Array.isArray(versions) ? versions : []) {
+        const value = item && typeof item === 'object' ? item.version : item;
+        if (!parseVersion(value)) continue;
+        const normalized = String(value).replace(/^v/, '');
+        if (!best || compareVersions(normalized, best) > 0) best = normalized;
+      }
+      return best;
+    }
+
+    function readUpdateCache() {
+      try {
+        const raw = window.localStorage.getItem(UPDATE_CACHE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed.at !== 'number' || !parseVersion(parsed.latest)) return null;
+        return parsed;
+      } catch {
+        return null;
+      }
+    }
+
+    function writeUpdateCache(latest) {
+      try {
+        window.localStorage.setItem(UPDATE_CACHE_KEY, JSON.stringify({ at: Date.now(), latest }));
+      } catch {
+        /* private mode: re-check next launch */
+      }
+    }
+
+    function readUpdateDismissed() {
+      try {
+        return window.localStorage.getItem(UPDATE_DISMISS_KEY) || '';
+      } catch {
+        return '';
+      }
+    }
+
+    function writeUpdateDismissed(version) {
+      try {
+        window.localStorage.setItem(UPDATE_DISMISS_KEY, String(version));
+      } catch {
+        /* private mode: the tip may come back next launch */
+      }
+    }
+
+    async function fetchLatestVersion() {
+      const request = typeof fetch === 'function' ? fetch : (typeof window !== 'undefined' ? window.fetch : null);
+      if (!request) throw new Error('fetch unavailable');
+      const response = await request(UPDATE_MARKET_URL, { cache: 'no-store' });
+      if (!response || !response.ok) throw new Error('market fetch failed');
+      const json = await response.json();
+      const plugins = json && Array.isArray(json.plugins) ? json.plugins : [];
+      const entry = plugins.find((item) => item && item.name === 'dsh-codequest');
+      const latest = latestVersion(entry && entry.versions);
+      if (!latest) throw new Error('no published version');
+      return latest;
+    }
+
+    /** The newest version to announce, or null when current is up to date. */
+    async function checkForUpdate(current) {
+      if (!parseVersion(current)) return null;
+      const now = Date.now();
+      const cached = readUpdateCache();
+      let latest = cached && now - cached.at < UPDATE_TTL ? cached.latest : null;
+      if (!latest) {
+        try {
+          latest = await fetchLatestVersion();
+          writeUpdateCache(latest);
+        } catch {
+          latest = cached ? cached.latest : null;
+        }
+      }
+      if (!latest || compareVersions(latest, current) <= 0) return null;
+      if (readUpdateDismissed() === latest) return null;
+      return latest;
+    }
+
+    /** Set by `apply()`: open Plugins → Discover and point at our market card. */
+    let openPluginsUpdate = null;
+
+    /** Scroll the market card into view and flash it; retries while the tab loads. */
+    function flashMarketEntry(tries, onFail) {
+      try {
+        if (typeof document === 'undefined' || !document.querySelector) return false;
+        const card = document.querySelector('[data-market-entry="dsh-codequest"]');
+        if (card) {
+          if (typeof card.scrollIntoView === 'function') card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          card.classList.add('cq-market-flash');
+          window.setTimeout(() => card.classList.remove('cq-market-flash'), 2600);
+          return true;
+        }
+        if (tries > 0) {
+          window.setTimeout(() => flashMarketEntry(tries - 1, onFail), 150);
+          return false;
+        }
+        if (typeof onFail === 'function') onFail();
+        return false;
+      } catch {
+        return false;
+      }
+    }
+
+    /**
+     * Git 安装的「更新」只在插件市场的「发现」页签里，Installed 详情页没有。
+     * 市场页签的 DOM id 由 DSH 的 SegmentedTabs 生成（`…-discover`），按
+     * aria-controls 找比按文案找稳。
+     */
+    function openDiscoverTab(tries, onFail) {
+      try {
+        if (typeof document === 'undefined' || !document.querySelector) return false;
+        const tab =
+          document.querySelector('[role="tab"][aria-controls$="-discover-panel"]') ||
+          document.querySelector('[role="tab"][id$="-discover"]');
+        if (tab) {
+          tab.click();
+          window.setTimeout(() => flashMarketEntry(20, onFail), 250);
+          return true;
+        }
+        if (tries > 0) {
+          window.setTimeout(() => openDiscoverTab(tries - 1, onFail), 120);
+          return true;
+        }
+        if (typeof onFail === 'function') onFail();
+        return false;
+      } catch {
+        return false;
+      }
+    }
+
     /** Persisted default from the Host (`prefs.hud`): `bar` | `pill` | `open` | `off`. */
     function hudPref() {
       const prefs = questStore.data && questStore.data.prefs;
@@ -2215,6 +2410,37 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
       questStore.notify();
       try {
         await api('/config', { hud: next });
+      } finally {
+        void questStore.refresh();
+      }
+    }
+
+    /** 卡片动效：镭射 / 流动 / 炫彩，各自独立开关，存在 Host 的 prefs.hudFx 里。 */
+    const HUD_FX_KEYS = ['laser', 'flow', 'color'];
+    const HUD_FX_DEFAULT = Object.freeze({ laser: true, flow: true, color: true });
+    const HUD_FX_LABELS = { laser: 'hudFxLaser', flow: 'hudFxFlow', color: 'hudFxColor' };
+
+    function hudFx() {
+      const prefs = questStore.data && questStore.data.prefs;
+      const raw = prefs && prefs.hudFx;
+      const fx = { ...HUD_FX_DEFAULT };
+      if (raw && typeof raw === 'object') {
+        for (const key of HUD_FX_KEYS) {
+          if (typeof raw[key] === 'boolean') fx[key] = raw[key];
+        }
+      }
+      return fx;
+    }
+
+    async function setHudFx(key, enabled) {
+      if (!HUD_FX_KEYS.includes(key)) return;
+      const next = { ...hudFx(), [key]: Boolean(enabled) };
+      // 先改本地快照让开关和卡片当场响应，再把整份 hudFx 交给 Host 合并保存。
+      if (questStore.data) questStore.data.prefs = { ...(questStore.data.prefs || {}), hudFx: next };
+      questStore.notify();
+      try {
+        // 只提交变化的那一个开关：Host 合并，快速连点时不会把别的开关覆盖回旧值。
+        await api('/config', { hudFx: { [key]: Boolean(enabled) } });
       } finally {
         void questStore.refresh();
       }
@@ -2390,9 +2616,34 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
       const t = (props && props.t) || pluginT;
       const { data, live, float } = useQuestStore();
       const mode = readHudMode();
+      const fx = hudFx();
+      const cardClass = `cq-hudcard${fx.laser ? ' cq-fx-laser' : ''}${fx.flow ? ' cq-fx-flow' : ''}${fx.color ? ' cq-fx-color' : ''}`;
       const drag = useHudDrag();
       const [floats, setFloats] = useState([]);
+      const [updateLatest, setUpdateLatest] = useState(null);
       const lastFloat = useRef(0);
+      const version = data && data.version;
+
+      // 市场有新版本时在卡片上方挂一条提示；每 6 小时最多查一次，失败静默。
+      useEffect(() => {
+        if (!version) return undefined;
+        let alive = true;
+        const run = () => {
+          void checkForUpdate(version)
+            .then((latest) => {
+              if (alive) setUpdateLatest(latest);
+            })
+            .catch(() => {
+              /* offline / rate limited: keep whatever the last check said */
+            });
+        };
+        run();
+        const timer = window.setInterval(run, UPDATE_TTL);
+        return () => {
+          alive = false;
+          window.clearInterval(timer);
+        };
+      }, [version]);
 
       // Turn the store's latest token gain into a short-lived bubble.
       useEffect(() => {
@@ -2448,6 +2699,44 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
           onDone: () => setFloats((list) => list.filter((item) => item.id !== entry.id)),
         }),
       );
+      const dismissUpdate = () => {
+        if (updateLatest) writeUpdateDismissed(updateLatest);
+        setUpdateLatest(null);
+      };
+      // 只认「新版本」这一件事：不自动安装，点一下把人送到插件市场的更新入口。
+      const updateTip = updateLatest
+        ? h(
+            'div',
+            { className: 'cq-hudupd' },
+            h('span', null, String(t('updateTip')).replace('{version}', updateLatest)),
+            h(
+              'button',
+              {
+                type: 'button',
+                className: 'cq-hudupdgo',
+                onClick: (event) => {
+                  event.stopPropagation();
+                  if (openPluginsUpdate) openPluginsUpdate();
+                },
+              },
+              t('updateGo'),
+            ),
+            h(
+              'button',
+              {
+                type: 'button',
+                className: 'cq-hudupdx',
+                title: t('updateLater'),
+                'aria-label': t('updateLater'),
+                onClick: (event) => {
+                  event.stopPropagation();
+                  dismissUpdate();
+                },
+              },
+              '✕',
+            ),
+          )
+        : null;
 
       // 桌面细条：贴住窗口底部、与页面同宽，点条身展开卡片。
       if (mode === 'bar') {
@@ -2552,9 +2841,10 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
       return h(
         'div',
         { className: 'cq-hud', style: drag.style },
+        updateTip,
         h(
           'div',
-          { className: 'cq-hudcard' },
+          { className: cardClass },
           h(
             'div',
             { className: 'cq-hudhead cq-drag', ...drag.handle, title: t('hudDrag'), onDoubleClick: () => {
@@ -4024,6 +4314,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
       const crack = data.crack || { attempts: 0, required: 5, unlocked: false };
       const crackRequired = Number(crack.required) || 5;
       const crackAttempts = Number(crack.attempts) || 0;
+      const fx = hudFx();
       const [crackStage, setCrackStage] = useState(0);
       const [crackBusy, setCrackBusy] = useState(false);
       const [crackMode, setCrackMode] = useState(readCrackMode);
@@ -4217,6 +4508,32 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
                   },
                 },
                 t('hudReset'),
+              ),
+            ),
+            h(
+              'div',
+              { className: 'cq-prefrow', style: { marginTop: '10px' } },
+              h(
+                'div',
+                { style: { minWidth: 0, flex: 1 } },
+                h('div', { style: { fontSize: '12px', fontWeight: 700 } }, t('hudFx')),
+                h('div', { className: 'cq-note' }, t('hudFxHint')),
+                h(
+                  'div',
+                  { className: 'cq-chips', style: { marginTop: '8px' } },
+                  HUD_FX_KEYS.map((key) =>
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        key,
+                        className: `cq-fchip${fx[key] ? ' on' : ''}`,
+                        onClick: () => void setHudFx(key, !fx[key]),
+                      },
+                      t(HUD_FX_LABELS[key]),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -4882,8 +5199,16 @@ function LeaderboardTab({ t, data }) {
         requestTab,
         takeTab: takeRequestedTab,
       },
+      /** Test seam: 版本比较与市场结果（不跑网络）。 */
+      __update: {
+        compare: compareVersions,
+        latest: latestVersion,
+        parse: parseVersion,
+        check: checkForUpdate,
+        dismiss: writeUpdateDismissed,
+      },
       /** Test seam: floating-card visibility rules (they must survive a restart). */
-      __hud: { readHudMode, writeHudMode, hudPref, clampHudPos, canDrag: canStartHudDrag },
+      __hud: { readHudMode, writeHudMode, hudPref, hudFx, clampHudPos, canDrag: canStartHudDrag },
       /** Test seam: the unlock film's particle system and NEW-badge bookkeeping. */
       __film: {
         spawn: spawnFilmParticles,
@@ -4940,6 +5265,29 @@ function LeaderboardTab({ t, data }) {
         openQuestPage = (tab) => {
           if (tab) requestTab(tab);
           selectPanel(PANEL_ID);
+        };
+        // HUD 的「去更新」：Git 安装的更新按钮只在插件市场的「发现」页签里。
+        // 先选插件面板，再点它的 discover tab，最后把 CodeQuest 卡片滚进视野。
+        openPluginsUpdate = () => {
+          selectPanel('plugins');
+          let nav = null;
+          try {
+            nav = typeof ctx.get === 'function' ? ctx.get('pluginNavigation') : null;
+          } catch {
+            nav = null;
+          }
+          const fallback = () => {
+            if (fallback.done) return;
+            fallback.done = true;
+            try {
+              if (nav && typeof nav.openBundle === 'function') nav.openBundle('dsh-codequest');
+            } catch {
+              /* plugin manager unavailable: the panel is already open */
+            }
+          };
+          window.setTimeout(() => {
+            openDiscoverTab(15, fallback);
+          }, 120);
         };
 
         // 独立整页：作为 `main` 面板注册，和「插件」「日程」同级，不再占用会话标签栏。

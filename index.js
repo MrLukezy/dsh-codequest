@@ -58,6 +58,8 @@ const LIVE_SCAN_MS = 6_000;
 const MAX_BODY_BYTES = 64 * 1024;
 /** Accepted values for the floating-card preference (`prefs.hud`). */
 const HUD_MODES = new Set(['pill', 'open', 'bar', 'off']);
+/** Card effects (`prefs.hudFx`): each can be switched off independently. */
+const HUD_FX_KEYS = ['laser', 'flow', 'color'];
 /**
  * 反破解约定：前 5 次请求都会被劝回，第 6 次才真的开门（解锁隐藏成就
  * 「破解者」并允许客户端进入破解模式）。这个数字同时也是成就的 target，
@@ -75,7 +77,15 @@ const CRACK_REFUSALS = 5;
  * `DSH_SHARED_SECRET` environment variable. Both sides must match.
  */
 const PLACEHOLDER_SHARED_SECRET = 'change-me-codequest-shared-secret';
-const PLUGIN_VERSION = '0.7.0';
+/** The installed package version, also surfaced to the HUD for update checks. */
+function pluginVersion() {
+  try {
+    const manifest = JSON.parse(fs.readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
+    return typeof manifest.version === 'string' ? manifest.version : '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
 
 /** Achievement badges ship with the package and are served as static WebP. */
 const ICON_ROOT = fileURLToPath(new URL('./assets/icons/', import.meta.url));
@@ -114,8 +124,9 @@ function defaultState() {
      * Interface preferences that must survive a restart, because they live in
      * the browser otherwise and a reinstall or a new browser loses them.
      * `hud`: 'pill' | 'open' | 'bar' | 'off' — the floating card's default form.
+     * `hudFx`: card motion effects, each switchable from 数据 → 悬浮窗.
      */
-    prefs: { hud: 'pill' },
+    prefs: { hud: 'pill', hudFx: { laser: true, flow: true, color: true } },
     /**
      * 破解请求计数。只增不减：`attempts` 前 5 次只返回劝阻文案，第 6 次写入
      * `unlockedAt` 并解锁隐藏成就「破解者」。破解模式本身只影响客户端展示
@@ -138,7 +149,14 @@ function loadState() {
       sessions: parsed.sessions && typeof parsed.sessions === 'object' ? parsed.sessions : {},
       unlocked: parsed.unlocked && typeof parsed.unlocked === 'object' ? parsed.unlocked : {},
       cloud: { ...base.cloud, ...(parsed.cloud || {}) },
-      prefs: { ...base.prefs, ...(parsed.prefs || {}) },
+      prefs: {
+        ...base.prefs,
+        ...(parsed.prefs || {}),
+        hudFx: {
+          ...base.prefs.hudFx,
+          ...((parsed.prefs && parsed.prefs.hudFx) || {}),
+        },
+      },
       crack: { ...base.crack, ...(parsed.crack || {}) },
       meta: { ...base.meta, ...(parsed.meta || {}) },
     };
@@ -478,7 +496,7 @@ export function apply(ctx) {
         hasSecret: Boolean(state.cloud.sharedSecret),
         boards: state.cloud.boards || {},
       },
-      prefs: { hud: state.prefs.hud },
+      prefs: { hud: state.prefs.hud, hudFx: { ...state.prefs.hudFx } },
       // 破解进度：客户端用它显示「已劝阻 n / 5」和按钮状态。
       crack: crackView(),
     };
@@ -529,7 +547,7 @@ export function apply(ctx) {
         return { available: true, signedIn: false, profile: null };
       }
       const profile = await account.getProfile({
-        version: PLUGIN_VERSION,
+        version: pluginVersion(),
         locale: 'zh-CN',
         timezoneOffsetSeconds: -new Date().getTimezoneOffset() * 60,
       });
@@ -571,7 +589,7 @@ export function apply(ctx) {
           if (!sameOrigin(req)) return json(res, 403, { ok: false, error: 'cross_origin' });
           const stale = Date.now() - runtime.lastScanAt > LIVE_REFRESH_MS;
           if (stale && !runtime.scanning) void scan();
-          return json(res, 200, { ok: true, build: BUILD, ...statsPayload() });
+          return json(res, 200, { ok: true, build: BUILD, version: pluginVersion(), ...statsPayload() });
         },
       },
       {
@@ -694,12 +712,28 @@ export function apply(ctx) {
             state.prefs.hud = hud;
             save();
           }
+          // 卡片动效：允许只提交其中一个开关，Host 负责合并，客户端可以逐个切换。
+          if (body.hudFx && typeof body.hudFx === 'object' && !Array.isArray(body.hudFx)) {
+            const next = { ...state.prefs.hudFx };
+            let changed = false;
+            for (const key of HUD_FX_KEYS) {
+              if (typeof body.hudFx[key] === 'boolean') {
+                next[key] = body.hudFx[key];
+                changed = true;
+              }
+            }
+            if (changed) {
+              state.prefs.hudFx = next;
+              save();
+            }
+          }
           return json(res, 200, {
             ok: true,
             base: state.cloud.base,
             hasSecret: Boolean(state.cloud.sharedSecret),
             boards: state.cloud.boards || {},
             hud: state.prefs.hud,
+            hudFx: state.prefs.hudFx,
           });
         },
       },

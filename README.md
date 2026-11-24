@@ -19,7 +19,7 @@ https://raw.githubusercontent.com/MrLukezy/dsh-code-review/main/market/index.jso
 **方式二：直接从 GitHub 装**
 
 ```
-plugin_manager { action: "install_bundle", target: "git+https://github.com/MrLukezy/dsh-codequest.git#v0.10.1" }
+plugin_manager { action: "install_bundle", target: "git+https://github.com/MrLukezy/dsh-codequest.git#v0.11.0" }
 ```
 
 **方式三：本地目录**
@@ -95,6 +95,8 @@ CodeQuest 现在是一个**独立整页**，挂在 `main` 面板上（和「插�
 - **默认开启，重启后仍在**：`✕` 只关闭当前这一次视图（不写任何持久状态），刷新或重启 DSH 会自动回来。想彻底关掉用「数据 → 悬浮窗」里的四档开关（细条 / 胶囊 / 展开 / 关闭），它存在 Host 的 `state.json` 里（`prefs.hud`），换浏览器、重装插件都跟着走。
 - **可拖动**：按住胶囊或卡片标题栏即可拖到任意位置，位置记在 `localStorage['dsh-codequest.hudpos']`；窗口变小、记住的坐标跑到屏幕外时会自动回到默认角落，不会出现「窗口在但看不见」。想手动回角落用「数据 → 复位位置」，点了当场生效，不用刷新。
 - **实时**：HUD 走单独的 `/live` 轻接口（221 字节 vs `/state` 的 95 KB），每 3 秒一次，Token 数变化时会在曲线上飘一个绿色 `+1.2M`。
+- **新版本提示**：市场索引里有比当前安装版更新的版本时，展开卡片的顶部会出现 `新版本 vX.Y.Z 可用` 的小胶囊；点「去更新」打开插件页的「发现」页签并把 CodeQuest 卡片滚进视野，点「稍后」在当前版本内不再提示。检查结果缓存 6 小时，断网时静默。
+- **卡片动效**：展开的卡片默认带「镭射扫光 / 流动描边 / 炫彩呼吸」三组纯 CSS 动效，在「数据 → 悬浮窗 → 卡片动效」里可以逐个开关（存在 Host 的 `prefs.hudFx`，换浏览器也还在）；系统开启「减少动态效果」时自动停用，不跑 JS 动画。
 - **解锁提示**：成就解锁时右下角弹出 toast（徽章 + 名称 + 积分），6 秒自动消失，**点一下直接进 CodeQuest 成就页并定位到这张卡片**（先清掉搜索与分类，再把卡片滚到视野中间、描边扫光两秒），气泡同时收起；最多同时 4 条。
 - **浮层文案自带兜底**：HUD / toast 拿不到页面的 `t`，用的是插件自带的中英字典；locale 服务还没注册好、`bind()` 把握手 key 原样吐回来时也会回落到字典，不会把 `UNLOCKEDTOAST` 这种原始 key 显示出来。
 - 首次加载会以当前解锁集合为基线，**不会把历史成就一次性弹出来**；之后新解锁的才提示。

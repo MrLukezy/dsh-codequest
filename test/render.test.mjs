@@ -174,6 +174,9 @@ const dash = walk(views.DashboardTab({ data: payload, t, reload: async () => {} 
 if (!dash.text.includes('crackButton') && !dash.text.includes('crackModeOn')) {
   throw new Error('the dashboard lost its crack entry');
 }
+for (const key of ['hudFx', 'hudFxLaser', 'hudFxFlow', 'hudFxColor']) {
+  if (!dash.text.includes(key)) throw new Error(`the dashboard lost the ${key} effect control`);
+}
 for (const stage of [1, 3, 5, 6]) {
   const dialog = walk(
     views.CrackDialog({ stage, attempts: Math.min(stage, 5), required: 5, t, onClose: () => {}, onEnterMode: () => {} }),

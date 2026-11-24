@@ -166,6 +166,19 @@ if (hud.clampHudPos({ x: 5000, y: 5000 }) !== null) throw new Error('an off-scre
 if (hud.clampHudPos({ x: 100, y: 120 }) === null) throw new Error('an on-screen position must be kept');
 console.log('hud modes:', cases.length + 4, 'checks');
 
+// Card effects default on; each one can be switched off without touching the others.
+clientModule.__store.data = { prefs: { hud: 'open' } };
+const fxDefault = hud.hudFx();
+if (!fxDefault.laser || !fxDefault.flow || !fxDefault.color) {
+  throw new Error('all three card effects must default to on');
+}
+clientModule.__store.data = { prefs: { hud: 'open', hudFx: { laser: false, color: false } } };
+const fxCustom = hud.hudFx();
+if (fxCustom.laser !== false || fxCustom.flow !== true || fxCustom.color !== false) {
+  throw new Error(`stored effects were not honoured: ${JSON.stringify(fxCustom)}`);
+}
+console.log('hud effects: default on + per-effect overrides');
+
 // --- HUD drag: the pill's handle is the expand button itself --------------
 // 缩略态的拖拽手柄就是 pill 的展开按钮；早期实现只要 pointerdown 落在
 // button 上就放弃，胶囊因此完全拖不动。这里锁住判定规则。
@@ -379,5 +392,32 @@ if (selectedPanels[selectedPanels.length - 1] !== 'codequest') {
 if (nav.takeTab() !== 'achievements') throw new Error('the toast click must land on the achievements tab');
 if (nav.takeFocus() !== 'card_probe') throw new Error('the toast click must locate the unlocked card');
 console.log('unlock toast: opens the achievements tab and locates the card');
+
+// --- 新版本提示：只把严格更新的市场版本报出来 -------------------------------
+// 预发布后缀不参与比较（市场列表里的 rc 不该催人更新），同版本也不提示。
+const update = clientModule.__update;
+if (update.parse('0.10.1').join('.') !== '0.10.1') throw new Error('version parse failed');
+if (update.compare('0.10.1', '0.10.0') !== 1) throw new Error('0.10.1 must be newer than 0.10.0');
+if (update.compare('0.10.0', '0.10.0') !== 0) throw new Error('the same version must compare equal');
+if (update.compare('0.9.9', '0.10.0') !== -1) throw new Error('0.9.9 must be older than 0.10.0');
+if (update.compare('0.10.0-beta.1', '0.10.0') !== 0) throw new Error('prerelease versions are not announced');
+if (update.latest([{ version: '0.9.0' }, { version: '0.10.1' }, { version: '0.10.0' }]) !== '0.10.1') {
+  throw new Error('the newest stable market version must win');
+}
+if (update.latest([]) !== null) throw new Error('an empty market list has no version');
+console.log('update tip: semver compare + newest stable market version');
+
+// 市场最新版 > 当前版时才提示；同版本、已忽略的版本都不提示。
+globalThis.fetch = async () => ({
+  ok: true,
+  json: async () => ({
+    plugins: [{ name: 'dsh-codequest', versions: [{ version: '0.9.0' }, { version: '0.10.2' }] }],
+  }),
+});
+if ((await update.check('0.10.1')) !== '0.10.2') throw new Error('a newer market version must be announced');
+if ((await update.check('0.10.2')) !== null) throw new Error('the newest version must not announce itself');
+update.dismiss('0.10.2');
+if ((await update.check('0.10.1')) !== null) throw new Error('a dismissed version must stay quiet');
+console.log('update tip: newer market version announced, dismissed stays quiet');
 
 console.log('OK');
