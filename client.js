@@ -925,7 +925,18 @@ function levelArtUrl(level) {
 .cq-card.cq-locate::after{opacity:1;animation:cqShine 1s ease-out 2}
 .cq-overlay{position:fixed;right:16px;bottom:92px;z-index:60;display:flex;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:none;max-width:min(320px,calc(100vw - 32px))}
 .cq-overlay>*{pointer-events:auto}
-.cq-hud{position:relative;display:flex;flex-direction:column;align-items:flex-end}
+.cq-hud{position:relative;display:flex;flex-direction:column;align-items:flex-end;transform-origin:100% 100%}
+/* 展开/收起都从右下角这个锚点缩放：卡片向上长，收起时往下缩回。 */
+.cq-hud.is-card{animation:cqHudCardIn .28s cubic-bezier(.2,.8,.2,1) both}
+.cq-hud.is-pill{animation:cqHudPillIn .24s cubic-bezier(.2,.8,.2,1) both}
+.cq-hud.cq-hud-leaving{animation:cqHudCardOut .18s ease-in both;pointer-events:none}
+.cq-hud.is-pill.cq-hud-leaving{animation:cqHudPillOut .18s ease-in both}
+@keyframes cqHudCardIn{0%{opacity:0;transform:translateY(12px) scale(.86)}100%{opacity:1;transform:none}}
+@keyframes cqHudCardOut{0%{opacity:1;transform:none}100%{opacity:0;transform:translateY(7px) scale(.86)}}
+@keyframes cqHudPillIn{0%{opacity:0;transform:translateY(7px) scale(.92)}100%{opacity:1;transform:none}}
+@keyframes cqHudPillOut{0%{opacity:1;transform:none}100%{opacity:0;transform:translateY(6px) scale(.9)}}
+.cq-bar.cq-hud-leaving{animation:cqHudBarOut .18s ease-in both}
+@keyframes cqHudBarOut{0%{opacity:1;transform:none}100%{opacity:0;transform:translateY(8px)}}
 .cq-dash{display:flex;flex-direction:column;gap:12px}
 /* ── 日报：昨天的总结 + 近 30 天横滑对照 ── */
 .cq-daily{display:flex;flex-direction:column;gap:12px;width:100%;max-width:1040px;margin:0 auto}
@@ -1076,6 +1087,7 @@ html.cq-has-bar #root{padding-bottom:var(--cq-bar-h,40px);box-sizing:border-box}
 .cq-barmeta{font-variant-numeric:tabular-nums;white-space:nowrap}
 .cq-hudlive.bar{width:8px;height:8px;margin:0}
 @media (prefers-reduced-motion: reduce){
+  .cq-hud,.cq-hud .cq-hudtitle,.cq-bar{animation:none!important}
   .cq-hudlive.on,.cq-hudlive.on::after,.cq-sparkdot.on,.cq-hudnum.tick{animation:none}
   .cq-spark-anim .cq-sparkline{animation:none;stroke-dashoffset:0}
   .cq-sparkcomet{display:none}
@@ -1112,6 +1124,10 @@ html.cq-has-bar #root{padding-bottom:var(--cq-bar-h,40px);box-sizing:border-box}
 .cq-hudhead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .cq-hudhead img{width:30px;height:30px;border-radius:50%;object-fit:cover;box-shadow:0 0 0 2px color-mix(in srgb,#4d6bfe 40%,transparent)}
 .cq-hudtitle{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cq-hud.is-card .cq-hudtitle{animation:cqHudTitleIn .3s cubic-bezier(.2,.8,.2,1) .03s both}
+.cq-hud.cq-hud-leaving .cq-hudtitle{animation:cqHudTitleOut .17s ease-in both}
+@keyframes cqHudTitleIn{0%{opacity:0;transform:translateY(7px)}100%{opacity:1;transform:none}}
+@keyframes cqHudTitleOut{0%{opacity:1;transform:none}100%{opacity:0;transform:translateY(6px)}}
 .cq-levelup-active{overflow:visible}
 .cq-hudsub{font-size:10.5px;color:var(--dsw-alias-label-secondary,#5b6472);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* 等级数字：旧数字向上滚出，新数字从下方带缩放落位；速度刻意放慢。 */
@@ -2988,8 +3004,26 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
       const drag = useHudDrag();
       const [floats, setFloats] = useState([]);
       const [updateLatest, setUpdateLatest] = useState(null);
+      const [leaving, setLeaving] = useState(false);
       const lastFloat = useRef(0);
+      const leaveTimer = useRef(0);
       const version = data && data.version;
+
+      /**
+       * Let the current pill/card play its shrink before swapping the mode.
+       * The next form mounts with the matching entry animation, so the whole
+       * change is anchored at the bottom-right instead of snapping.
+       */
+      const switchHudMode = useCallback((next) => {
+        if (leaving) return;
+        setLeaving(true);
+        window.clearTimeout(leaveTimer.current);
+        leaveTimer.current = window.setTimeout(() => {
+          writeHudMode(next);
+          setLeaving(false);
+        }, 180);
+      }, [leaving]);
+      useEffect(() => () => window.clearTimeout(leaveTimer.current), []);
 
       // 市场有新版本时在卡片上方挂一条提示；每 6 小时最多查一次，失败静默。
       useEffect(() => {
@@ -3051,6 +3085,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
       const values = days.map((day) => day.value);
       const pct = p.levelNeed > 0 ? Math.min(100, (p.levelInto / p.levelNeed) * 100) : 0;
       const avatar = levelArtUrl(p.level);
+      const hudClass = `cq-hud${leaving ? ' cq-hud-leaving' : ''}${mode === 'open' ? ' is-card' : ' is-pill'}`;
       // 最近 12 秒有新的 Token 进账 = 正在工作；/live 每 3 秒一次，状态会自然过期。
       const working = Boolean(float && Date.now() - float.at < 12000);
       const liveLabel = t(working ? 'hudWorking' : 'hudIdle');
@@ -3115,7 +3150,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
         return h(
           'div',
           {
-            className: `cq-bar${working ? ' live' : ''}`,
+            className: `cq-bar${working ? ' live' : ''}${leaving ? ' cq-hud-leaving' : ''}`,
             role: 'status',
             title: t('hudBarOpen'),
             onClick: (event) => {
@@ -3123,7 +3158,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
               const target = event && event.target;
               if (target && typeof target.closest === 'function' && target.closest('button')) return;
               hudReturnMode = 'bar';
-              writeHudMode('open');
+              switchHudMode('open');
             },
           },
           levelBanner,
@@ -3186,7 +3221,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
       if (mode === 'pill') {
         return h(
           'div',
-          { className: 'cq-hud', style: drag.style },
+          { className: hudClass, style: drag.style },
           h(
             'div',
             { className: `cq-hudpill${working ? ' live' : ''}` },
@@ -3205,7 +3240,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
                     return;
                   }
                   hudReturnMode = 'pill';
-                  writeHudMode('open');
+                  switchHudMode('open');
                 },
                 title: `${t('hudOpen')} · ${t('hudPill')}`,
               },
@@ -3220,7 +3255,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
               h(CountUp, { value: tokensToday, format: fmtTokens, className: `cq-hudnum${working ? ' tick' : ''}` }),
               h(Sparkline, { values, width: 40, height: 15, pulse: working, animated: fx.line }),
             ),
-            h('button', { type: 'button', className: 'cq-hudx', onClick: () => writeHudMode('open'), title: t('hudOpen') }, '↓'),
+            h('button', { type: 'button', className: 'cq-hudx', onClick: () => switchHudMode('open'), title: t('hudOpen') }, '↓'),
             h('button', { type: 'button', className: 'cq-hudx', onClick: hide, title: t('hudHide') }, '✕'),
             h('div', { className: 'cq-floats' }, bubbles),
           ),
@@ -3229,7 +3264,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
 
       return h(
         'div',
-        { className: 'cq-hud', style: drag.style },
+        { className: hudClass, style: drag.style },
         levelBanner,
         updateTip,
         h(
@@ -3240,7 +3275,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
             { className: 'cq-hudhead cq-drag', ...drag.handle, title: t('hudDrag'), onDoubleClick: () => {
                 // 双击胶囊展开的那次双击会补一个 dblclick 到标题栏上，忽略它。
                 if (Date.now() - hudOpenedAt < 500) return;
-                writeHudMode(hudReturnMode);
+                switchHudMode(hudReturnMode);
               } },
             h('img', { src: avatar, alt: '' }),
             h(
@@ -3281,7 +3316,7 @@ function UnlockFilm({ item, t, onDone, onClose, onOpenDetail, preview }) {
               {
                 type: 'button',
                 className: 'cq-hudx',
-                onClick: () => writeHudMode(hudReturnMode),
+                onClick: () => switchHudMode(hudReturnMode),
                 onDoubleClick: (event) => event.stopPropagation(),
                 title: t('hudClose'),
               },

@@ -23,7 +23,10 @@ globalThis.window = {
   innerHeight: 900,
   setInterval: () => 0,
   clearInterval: () => {},
-  setTimeout: () => 0,
+  setTimeout: (fn) => {
+    fn();
+    return 0;
+  },
   clearTimeout: () => {},
 };
 
@@ -107,6 +110,7 @@ mod.__store.data = {
 };
 
 const tree = mod.__views.QuestHud({ t: (key) => key });
+assert(String(tree.props.className || '').includes('is-card'), 'the expanded HUD must carry its scale-in mode class');
 
 // Card effects: all three default on, and each can be removed independently.
 const fxCard = find(tree, (node) => String(node.props.className || '').includes('cq-hudcard'));
@@ -150,6 +154,7 @@ assert(mod.__hud.readHudMode() === 'pill', 'the card should read back as a pill 
 // Re-render in pill mode and check the collapse/expand affordances.
 const pill = mod.__views.QuestHud({ t: (key) => key });
 assert(pill && String(pill.props.className || '').includes('cq-hud'), 'the pill must still render');
+assert(String(pill.props.className).includes('is-pill'), 'the collapsed HUD must carry its scale-in mode class');
 const pillDown = find(pill, (node) => node.props && node.props.title === 'hudOpen');
 assert(pillDown, 'the pill must show a down arrow that expands it');
 assert(pillDown.children[0] === '↓', `pill expand glyph should be a down arrow, got ${JSON.stringify(pillDown.children[0])}`);
